@@ -1,0 +1,18 @@
+ i want to created simple 3D game for my presenation to my colleags about vibe coding. 
+ The game is about that main person {Head of our team} is finding in city the employs to go to worl
+ 
+ Player should  able to walk with WASD, jump with space bar and have one active ability - catch to catch the employ. Activated by left mous button 
+City {game space}- visually aesthetic procedural city simulation. The city should have the following:
+
+-Buildings
+-Streets with sidewalks, traffic lights, etc
+-Trees, vegetation, parks, etc.
+-Animated people walking around the city
+-Cars driving around in traffic
+-Other details important in a city you must think of yourself, you will be checked for level of realistic detail you include. 
+
+Each element should be detailed and realistic as you can. E.g. model the cars and people etc. You will be checked each of these is present, working
+----
+Employes  - different NPC {20} which will run around city, scream {in czech if possible} when player is near, npc are slower then player
+
+The game should be able to run in browser
