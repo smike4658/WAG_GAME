@@ -120,6 +120,42 @@ When extruding buildings from OSM data:
 - Never use `any` type - always create proper interfaces
 - TypeScript strict mode is enabled
 
+## Git Workflow
+
+**IMPORTANT:** After completing any implementation task, ALWAYS commit and push changes to the repository.
+
+### After Completing Implementation
+
+1. Stage all changes: `git add .`
+2. Create a descriptive commit message summarizing what was implemented
+3. Push to origin: `git push`
+
+### Commit Message Format
+
+```
+<type>: <short description>
+
+<optional longer description>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+Types: `feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`
+
+### When to Commit
+
+- After completing a feature or fix
+- After significant refactoring
+- Before switching to a different task
+- When user explicitly asks
+
+**Do NOT commit:**
+- Work in progress with broken builds
+- Temporary debug code
+- Sensitive data (check .gitignore)
+
 ## MCP Server Configuration
 
 The Sketchfab MCP server requires an API key:
