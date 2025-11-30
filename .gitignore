@@ -35,9 +35,12 @@ Thumbs.db
 traffic-simulation-reference/
 TripoSR/
 
-# Downloaded models (large files)
-low-poly-city/
-models/
+# Downloaded models (large files - root level only)
+/low-poly-city/
+/models/
+
+# BUT include public models for deployment
+!public/models/
 
 # Screenshots (optional, remove if you want to keep them)
 # *.png
