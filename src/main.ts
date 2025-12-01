@@ -530,7 +530,12 @@ class Game {
           min: new THREE.Vector2(cityBox.min.x, cityBox.min.z),
           max: new THREE.Vector2(cityBox.max.x, cityBox.max.z),
         };
-        this.powerupManager.initialize(cityBounds);
+        // Use spawn offset from level config to avoid center props
+        const spawnOffset = this.selectedLevel?.staticConfig?.spawnOffset;
+        const powerupOffset: [number, number] | undefined = spawnOffset
+          ? [spawnOffset[0], spawnOffset[2]]
+          : undefined;
+        this.powerupManager.initialize(cityBounds, powerupOffset);
       }
 
       // Set up powerup callbacks

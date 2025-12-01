@@ -179,19 +179,30 @@ export class PowerupManager {
 
   /**
    * Initialize spawn locations based on city bounds
+   * @param cityBounds - City boundaries
+   * @param centerOffset - Optional offset from center to avoid props [x, z]
    */
-  public initialize(cityBounds: { min: THREE.Vector2; max: THREE.Vector2 }): void {
+  public initialize(
+    cityBounds: { min: THREE.Vector2; max: THREE.Vector2 },
+    centerOffset?: [number, number]
+  ): void {
     const centerX = (cityBounds.min.x + cityBounds.max.x) / 2;
     const centerZ = (cityBounds.min.y + cityBounds.max.y) / 2;
     const width = cityBounds.max.x - cityBounds.min.x;
     const depth = cityBounds.max.y - cityBounds.min.y;
 
-    // 3 spawn locations: center + 2 nearby positions (closer to square)
+    // Apply offset to avoid center props (cactus, fountain, etc.)
+    const offsetX = centerOffset?.[0] ?? 0;
+    const offsetZ = centerOffset?.[1] ?? 0;
+
+    // 3 spawn locations: offset center + 2 nearby positions
     const positions = [
-      new THREE.Vector3(centerX, 0, centerZ),                             // Center
-      new THREE.Vector3(centerX + width * 0.1, 0, centerZ + depth * 0.1), // Near center 1
-      new THREE.Vector3(centerX - width * 0.1, 0, centerZ - depth * 0.1), // Near center 2
+      new THREE.Vector3(centerX + offsetX, 0, centerZ + offsetZ),                             // Offset center
+      new THREE.Vector3(centerX + offsetX + width * 0.1, 0, centerZ + offsetZ + depth * 0.1), // Near center 1
+      new THREE.Vector3(centerX + offsetX - width * 0.1, 0, centerZ + offsetZ - depth * 0.1), // Near center 2
     ];
+
+    console.log(`[PowerupManager] Center offset applied: [${offsetX}, ${offsetZ}]`);
 
     for (const pos of positions) {
       const groundCircle = this.createGroundCircle(pos);
