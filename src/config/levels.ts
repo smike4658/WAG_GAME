@@ -29,6 +29,8 @@ export interface LevelConfig {
     positionCorrection?: [number, number, number];
     /** Offset for generated waypoints (useful if road mesh includes curbs) */
     roadWaypointOffset?: number;
+    /** Spawn position offset [x, y, z] from city center - use to avoid props in center */
+    spawnOffset?: [number, number, number];
   };
 }
 
@@ -63,6 +65,8 @@ export const LEVELS: LevelConfig[] = [
       positionCorrection: [0, -0.35, 0],
       // Lower waypoints slightly to account for curb height in this model
       roadWaypointOffset: -0.15,
+      // Offset spawn away from center props (plants, fountains)
+      spawnOffset: [25, 0, 25],
     },
   },
   {
@@ -79,6 +83,8 @@ export const LEVELS: LevelConfig[] = [
       rotationCorrection: [0, 0, 0],
       // Lower city so player stands on street (not floating)
       positionCorrection: [0, -3.2, 0],
+      // Offset spawn away from center props (cactus, plants)
+      spawnOffset: [30, 0, 20],
     },
   },
 ];

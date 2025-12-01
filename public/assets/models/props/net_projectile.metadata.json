@@ -1,0 +1,38 @@
+{
+  "name": "Net Projectile",
+  "description": "Stylized low-poly net projectile for net launcher. Fires when mouse button pressed, expands on impact.",
+  "source": "Custom Blender creation",
+  "creator": "WAG GAME Team (via Blender MCP)",
+  "license": "Project Asset",
+  "created": "2025-01-30",
+  "specifications": {
+    "vertices": 726,
+    "faces": 634,
+    "fileSize": "96.9 KB",
+    "format": "GLB"
+  },
+  "materials": [
+    {
+      "name": "Projectile_Cyan",
+      "color": "#19CDE6",
+      "description": "Bundled net body"
+    },
+    {
+      "name": "Projectile_Rope",
+      "color": "#FF6619",
+      "description": "Orange rope wrapping and trails"
+    },
+    {
+      "name": "Weight_Yellow",
+      "color": "#FFD919",
+      "description": "Trailing weights"
+    }
+  ],
+  "usage": {
+    "purpose": "Net launcher projectile - fired on LMB click",
+    "behavior": "Flies through air, expands to throwing_net.glb on impact",
+    "range": "20m",
+    "cooldown": "1s",
+    "relatedAssets": ["throwing_net.glb"]
+  }
+}

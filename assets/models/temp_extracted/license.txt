@@ -1,0 +1,11 @@
+Model Information:
+* title:	Minecraft Alex Character Animated
+* source:	https://sketchfab.com/3d-models/minecraft-alex-character-animated-09835504d17543959d7164353993b9d6
+* author:	nythr (https://sketchfab.com/dylan.fini)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Minecraft Alex Character Animated" (https://sketchfab.com/3d-models/minecraft-alex-character-animated-09835504d17543959d7164353993b9d6) by nythr (https://sketchfab.com/dylan.fini) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

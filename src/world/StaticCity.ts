@@ -28,6 +28,8 @@ interface StaticCityConfig {
   positionCorrection?: [number, number, number];
   /** Offset for generated waypoints */
   roadWaypointOffset?: number;
+  /** Spawn position offset [x, y, z] from city center - use to avoid props in center */
+  spawnOffset?: [number, number, number];
 }
 
 const DEFAULT_CONFIG: Omit<StaticCityConfig, 'mtlPath'> = {
@@ -212,7 +214,17 @@ export class StaticCity {
       const cityModelBox = new THREE.Box3().setFromObject(this.cityModel);
       const cityModelCenter = cityModelBox.getCenter(new THREE.Vector3());
       // Spawn at street level (bottom of city model, not ground plane)
-      this.spawnPosition.set(cityModelCenter.x, cityModelBox.min.y, cityModelCenter.z);
+      // Apply spawn offset if configured (to avoid props in center)
+      const spawnOffset = this.config.spawnOffset ?? [0, 0, 0];
+      console.log(`[StaticCity] Config spawnOffset:`, this.config.spawnOffset);
+      console.log(`[StaticCity] Using spawnOffset: [${spawnOffset.join(', ')}]`);
+      console.log(`[StaticCity] City center: (${cityModelCenter.x.toFixed(2)}, ${cityModelCenter.z.toFixed(2)})`);
+      this.spawnPosition.set(
+        cityModelCenter.x + spawnOffset[0],
+        cityModelBox.min.y + spawnOffset[1],
+        cityModelCenter.z + spawnOffset[2]
+      );
+      console.log(`[StaticCity] Final spawn position: (${this.spawnPosition.x.toFixed(2)}, ${this.spawnPosition.y.toFixed(2)}, ${this.spawnPosition.z.toFixed(2)})`);
       console.log(`[StaticCity] Spawn Y: ${cityModelBox.min.y.toFixed(2)} (city model min/max Y: ${cityModelBox.min.y.toFixed(2)}/${cityModelBox.max.y.toFixed(2)})`);
 
       onProgress?.(80, 'Setting up collisions...');

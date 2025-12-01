@@ -1,0 +1,36 @@
+{
+  "name": "Throwing Net",
+  "description": "Stylized low-poly throwing net for net launcher weapon. Colorful game-ready asset.",
+  "source": "Custom Blender creation",
+  "creator": "WAG GAME Team (via Blender MCP)",
+  "license": "Project Asset",
+  "created": "2025-01-30",
+  "specifications": {
+    "vertices": 483,
+    "faces": 552,
+    "fileSize": "54.2 KB",
+    "format": "GLB"
+  },
+  "materials": [
+    {
+      "name": "Net_Stylized",
+      "color": "#19CDE6",
+      "description": "Cyan mesh surface"
+    },
+    {
+      "name": "Rope_Orange",
+      "color": "#FF6619",
+      "description": "Orange rope wireframe pattern"
+    },
+    {
+      "name": "Border_Yellow",
+      "color": "#FFD919",
+      "description": "Yellow weighted border ring"
+    }
+  ],
+  "usage": {
+    "purpose": "Expanded net - spawns on projectile impact to catch employees",
+    "behavior": "Appears when net_projectile.glb hits target",
+    "relatedAssets": ["net_projectile.glb"]
+  }
+}

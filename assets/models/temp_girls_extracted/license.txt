@@ -1,0 +1,11 @@
+Model Information:
+* title:	Low Poly Girls
+* source:	https://sketchfab.com/3d-models/low-poly-girls-946bab87d754471388cc8ce311955cf3
+* author:	MaryGraz (https://sketchfab.com/MaryGraz)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Low Poly Girls" (https://sketchfab.com/3d-models/low-poly-girls-946bab87d754471388cc8ce311955cf3) by MaryGraz (https://sketchfab.com/MaryGraz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

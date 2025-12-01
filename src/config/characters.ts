@@ -59,34 +59,69 @@ export const EMPLOYEE_ROLES: RoleConfig[] = [
       },
     },
   },
-  // Ostatní role používají fallback mesh (bez externích modelů)
   {
     id: 'backend-developer',
     displayName: 'Backend Developer',
     displayNameCz: 'Backend Vývojář',
-    genders: ['male', 'female'],
-    models: {},  // Fallback mesh
+    genders: ['male'],
+    models: {
+      male: {
+        path: 'assets/models/backend-developer.glb',
+        sketchfabId: 'stylized-variant',
+        name: 'Backend Developer (Animated)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+      },
+    },
   },
   {
     id: 'ui-ux-designer',
     displayName: 'UI/UX Designer',
     displayNameCz: 'UI/UX Designér',
-    genders: ['male', 'female'],
-    models: {},  // Fallback mesh
+    genders: ['male'],
+    models: {
+      male: {
+        path: 'assets/models/ui-ux-designer.glb',
+        sketchfabId: 'stylized-variant',
+        name: 'UI/UX Designer (Animated)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+      },
+    },
   },
   {
     id: 'qa-tester',
     displayName: 'QA Tester',
     displayNameCz: 'QA Tester',
-    genders: ['male', 'female'],
-    models: {},  // Fallback mesh
+    genders: ['male'],
+    models: {
+      male: {
+        path: 'assets/models/qa-tester.glb',
+        sketchfabId: 'stylized-variant',
+        name: 'QA Tester (Animated)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+      },
+    },
   },
   {
     id: 'business-analyst',
     displayName: 'Business Analyst',
     displayNameCz: 'Business Analytik',
-    genders: ['male', 'female'],
-    models: {},  // Fallback mesh
+    genders: ['male'],
+    models: {
+      male: {
+        path: 'assets/models/business-analyst.glb',
+        sketchfabId: 'stylized-variant',
+        name: 'Business Analyst (Animated)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+      },
+    },
   },
   {
     id: 'product-owner',
@@ -109,7 +144,16 @@ export const EMPLOYEE_ROLES: RoleConfig[] = [
     displayName: 'DevOps Engineer',
     displayNameCz: 'DevOps Inženýr',
     genders: ['male'],
-    models: {},  // Fallback mesh
+    models: {
+      male: {
+        path: 'assets/models/devops.glb',
+        sketchfabId: 'stylized-variant',
+        name: 'DevOps Engineer (Animated)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+      },
+    },
   },
 ];
 

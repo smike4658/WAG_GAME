@@ -31,8 +31,9 @@ interface SimulatedVehicle {
   // Lane offset (right side driving)
   laneOffset: THREE.Vector3;
 
-  // Original rotation offset (some cars in model are pre-rotated)
-  initialRotationY: number;
+  // Model rotation offset: compensates for model's forward direction
+  // If model's "front" is +X instead of +Z, this will be ~-PI/2
+  modelRotationOffset: number;
 
   // Traffic light ignore timer - after turning, ignore lights for a short distance
   // This prevents stopping at bidirectional lights on the new road
@@ -358,12 +359,22 @@ export class AdvancedTrafficSystem {
       laneOffset = this.calculateLaneOffset(direction);
     }
 
-    // Store original rotation
-    const initialRotationY = mesh.rotation.y;
-
-    // Calculate initial rotation based on direction to first waypoint
+    // Calculate expected rotation based on direction to first waypoint
+    // This is what rotation.y SHOULD be if model's forward is +Z
     const initialDirection = nextWp.position.clone().sub(waypoint.position).normalize();
-    const initialAngle = Math.atan2(initialDirection.x, initialDirection.z);
+    const expectedAngle = Math.atan2(initialDirection.x, initialDirection.z);
+
+    // The mesh's current rotation.y represents how it was placed in the scene
+    // The difference tells us the model's forward direction offset
+    // e.g., if model forward is +X, and car is facing +Z direction:
+    //   - expectedAngle = 0 (for +Z)
+    //   - mesh.rotation.y = -PI/2 (to rotate +X forward to +Z)
+    //   - modelRotationOffset = -PI/2 - 0 = -PI/2
+    let modelRotationOffset = mesh.rotation.y - expectedAngle;
+
+    // Normalize to [-PI, PI]
+    while (modelRotationOffset > Math.PI) modelRotationOffset -= 2 * Math.PI;
+    while (modelRotationOffset < -Math.PI) modelRotationOffset += 2 * Math.PI;
 
     const vehicle: SimulatedVehicle = {
       id,
@@ -379,10 +390,10 @@ export class AdvancedTrafficSystem {
       vehicleType,
       length,
       laneOffset,
-      initialRotationY,
+      modelRotationOffset,
       ignoreTrafficLightsDistance: 0,
       collisionBox: new THREE.Box3().setFromObject(mesh),
-      smoothedRotationY: initialAngle, // Initialize with correct direction
+      smoothedRotationY: expectedAngle, // Initialize with direction to waypoint
       waypointCommitmentTime: 0,
       stuckTime: 0,
     };
@@ -490,6 +501,11 @@ export class AdvancedTrafficSystem {
     const needsToTurn = Math.abs(angleDiffForMove) > 0.78; // ~45 degrees
     const turnSpeedMultiplier = needsToTurn ? 0.1 : 1.0; // Almost stop while turning
 
+    // Debug: log when vehicle is actively turning
+    if (needsToTurn && vehicle.id === 'vehicle_0' && this.debugFrame % 30 === 0) {
+      console.log(`[DEBUG TURNING] Vehicle 0: angleDiff=${(angleDiffForMove * 180 / Math.PI).toFixed(0)}°, speed=${(vehicle.velocity * turnSpeedMultiplier).toFixed(1)}, targetWp=${vehicle.targetWaypointId}`);
+    }
+
     // Update lane offset when direction changes significantly (at intersections)
     // ONLY if the waypoint doesn't specify a direction (which means it's a center-line waypoint)
     if (targetWp.direction) {
@@ -540,7 +556,9 @@ export class AdvancedTrafficSystem {
       // Use faster rotation when angle difference is large (turning at intersection)
       // Normal smoothing for small adjustments, faster for big turns
       const isLargeTurn = Math.abs(angleDiff) > 0.5; // ~30 degrees
-      const smoothingFactor = isLargeTurn ? 0.15 : this.config.rotationSmoothing;
+      const isVeryLargeTurn = Math.abs(angleDiff) > 1.0; // ~57 degrees
+      // Very large turns (like 90°) get aggressive smoothing for quick visual response
+      const smoothingFactor = isVeryLargeTurn ? 0.25 : (isLargeTurn ? 0.15 : this.config.rotationSmoothing);
 
       // Apply smoothing - lerp towards target angle
       vehicle.smoothedRotationY += angleDiff * smoothingFactor;
@@ -549,7 +567,9 @@ export class AdvancedTrafficSystem {
       while (vehicle.smoothedRotationY > Math.PI) vehicle.smoothedRotationY -= 2 * Math.PI;
       while (vehicle.smoothedRotationY < -Math.PI) vehicle.smoothedRotationY += 2 * Math.PI;
 
-      // Account for parent rotation - need to use WORLD rotation, not local
+      // Apply rotation: smoothedRotationY + modelRotationOffset
+      // modelRotationOffset compensates for the model's forward direction
+      // (e.g., if model forward is +X, offset is -PI/2)
       if (parent) {
         // Get parent's world rotation (handles nested hierarchies)
         const parentWorldQuat = new THREE.Quaternion();
@@ -557,14 +577,14 @@ export class AdvancedTrafficSystem {
         const parentEuler = new THREE.Euler().setFromQuaternion(parentWorldQuat, 'YXZ');
         const parentWorldRotY = parentEuler.y;
 
-        vehicle.mesh.rotation.y = vehicle.smoothedRotationY - parentWorldRotY;
+        vehicle.mesh.rotation.y = vehicle.smoothedRotationY + vehicle.modelRotationOffset - parentWorldRotY;
       } else {
-        vehicle.mesh.rotation.y = vehicle.smoothedRotationY;
+        vehicle.mesh.rotation.y = vehicle.smoothedRotationY + vehicle.modelRotationOffset;
       }
 
       // Debug logging every 5 seconds for first vehicle
       if (this.debugFrame % 300 === 0 && vehicle.id === 'vehicle_0') {
-        console.log(`[DEBUG] Vehicle 0: targetAngle=${(targetAngle * 180 / Math.PI).toFixed(1)}°, smoothedRotY=${(vehicle.smoothedRotationY * 180 / Math.PI).toFixed(1)}°, meshRotY=${(vehicle.mesh.rotation.y * 180 / Math.PI).toFixed(1)}°, angleDiff=${(angleDiff * 180 / Math.PI).toFixed(1)}°`);
+        console.log(`[DEBUG] Vehicle 0: targetAngle=${(targetAngle * 180 / Math.PI).toFixed(1)}°, smoothedRotY=${(vehicle.smoothedRotationY * 180 / Math.PI).toFixed(1)}°, modelOffset=${(vehicle.modelRotationOffset * 180 / Math.PI).toFixed(1)}°, meshRotY=${(vehicle.mesh.rotation.y * 180 / Math.PI).toFixed(1)}°`);
       }
     }
 
@@ -849,6 +869,14 @@ export class AdvancedTrafficSystem {
         // Check if this is a significant turn (direction change > 30 degrees)
         const dotProduct = currentDirection.dot(newDirection);
         const isTurning = dotProduct < 0.866; // cos(30°) ≈ 0.866
+
+        // Calculate turn angle for logging
+        const turnAngle = Math.acos(Math.min(1, Math.max(-1, dotProduct))) * 180 / Math.PI;
+
+        // Debug logging for turns at intersections
+        if (isTurning && vehicle.id === 'vehicle_0') {
+          console.log(`[DEBUG TURN] Vehicle 0 at intersection: turnAngle=${turnAngle.toFixed(0)}°, from=${vehicle.targetWaypointId} to=${bestNextId}, pos=(${vehicle.position.x.toFixed(1)}, ${vehicle.position.z.toFixed(1)})`);
+        }
 
         // Update waypoint chain
         vehicle.previousWaypointId = vehicle.currentWaypointId;

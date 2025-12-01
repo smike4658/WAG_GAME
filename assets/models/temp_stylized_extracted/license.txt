@@ -1,0 +1,11 @@
+Model Information:
+* title:	Bearded man - Low poly animated
+* source:	https://sketchfab.com/3d-models/bearded-man-low-poly-animated-5718a53d18a142f686b1d9f02a637773
+* author:	Agor_2012 (https://sketchfab.com/Agor_)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Bearded man - Low poly animated" (https://sketchfab.com/3d-models/bearded-man-low-poly-animated-5718a53d18a142f686b1d9f02a637773) by Agor_2012 (https://sketchfab.com/Agor_) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
