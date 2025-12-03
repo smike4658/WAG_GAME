@@ -873,13 +873,7 @@ export class Employee {
       this.state = 'panic';
       this.panicTimer = 0;
 
-      // Trigger scream when entering panic state
-      if (!this.hasScreamedThisEncounter) {
-        this.hasScreamedThisEncounter = true;
-        if (this.onScream) {
-          this.onScream(this);
-        }
-      }
+      // Note: scream is triggered when transitioning to fleeing, not here
     } else if (distanceToPlayer < this.config.detectionRadius) {
       this.state = 'alert';
     } else {
@@ -997,6 +991,14 @@ export class Employee {
     // Transition to fleeing after panic duration
     if (this.panicTimer >= this.config.panicDuration) {
       this.state = 'fleeing';
+
+      // Trigger scream when starting to flee (not during panic)
+      if (!this.hasScreamedThisEncounter) {
+        this.hasScreamedThisEncounter = true;
+        if (this.onScream) {
+          this.onScream(this);
+        }
+      }
     }
   }
 

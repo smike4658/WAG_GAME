@@ -476,13 +476,7 @@ class Game {
           this.audioManager.playPlayerApproachSound();
         }
       });
-      this.employeeManager.setOnNightRefuse((employee) => {
-        console.log(`[Game] ${employee.config.name} refuses to work at night!`);
-        // Play night refusal voice clip
-        this.audioManager.playNightRefusalSound(employee.getPosition());
-        // Flash HUD time indicator
-        this.hud.showNightMessage();
-      });
+      // Night refusal behavior removed - employees now work 24/7
 
       // Initialize NPC loader for lowpoly character models
       this.updateLoadingProgress(87, 'Loading NPC models...');
@@ -501,16 +495,8 @@ class Game {
         nightDuration: 30,    // 30 seconds for night
       });
 
-      // Set up day/night cycle callbacks
+      // Set up day/night cycle callbacks (visual only - employees work 24/7)
       this.dayNightCycle.setCallbacks({
-        onNight: () => {
-          console.log('[Game] Night has fallen!');
-          this.employeeManager?.setAllNightTime(true);
-        },
-        onDawn: () => {
-          console.log('[Game] Dawn is breaking!');
-          this.employeeManager?.setAllNightTime(false);
-        },
         onTimeChange: (phase, _progress) => {
           // Update HUD time indicator
           if (this.dayNightCycle) {

@@ -128,6 +128,10 @@ export class AudioManager {
   private ambientSounds: Map<string, Howl> = new Map();
   private ambientPlaying = false;
 
+  // NPC voice cooldown - prevents multiple NPCs speaking at once
+  private lastNpcVoiceTime = 0;
+  private readonly npcVoiceCooldown = 2000; // 2 seconds between NPC voices
+
   private constructor() {
     // Organize clips by role
     for (const clip of VOICE_CLIPS) {
@@ -283,9 +287,17 @@ export class AudioManager {
   /**
    * Play a random voice clip for a role at a position
    * 40% chance to use Ostrava slang phrases instead of role-specific ones
+   * Enforces cooldown so only one NPC speaks at a time
    */
   public playVoiceClip(role: string, position: THREE.Vector3): void {
     if (!this.enabled) return;
+
+    // Check cooldown - only one NPC can speak at a time
+    const now = Date.now();
+    if (now - this.lastNpcVoiceTime < this.npcVoiceCooldown) {
+      console.log(`[AudioManager] NPC voice skipped (cooldown): ${role}`);
+      return;
+    }
 
     // 40% chance to use Ostrava slang flee phrases
     const useOstravaSlang = Math.random() < 0.4;
@@ -299,6 +311,7 @@ export class AudioManager {
         return;
       }
 
+      this.lastNpcVoiceTime = now;
       this.playSoundAtPosition(clip.id, position, 2.0);
       return;
     }
@@ -323,6 +336,7 @@ export class AudioManager {
     }
 
     // NPC voices use 2x volume multiplier for better audibility
+    this.lastNpcVoiceTime = now;
     this.playSoundAtPosition(clip.id, position, 2.0);
   }
 
