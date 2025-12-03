@@ -289,8 +289,26 @@ export class Employee {
 
     // IMPORTANT: Recalculate bounding box after scaling and positioning
     // to ensure feet are exactly at Y=0 (fixes floating character issue)
+    // Use the same exclusion logic as the initial bounds calculation
     this.characterMesh.updateMatrixWorld(true);
-    const finalBox = new THREE.Box3().setFromObject(this.characterMesh);
+    const finalBox = new THREE.Box3();
+    model.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const meshName = child.name.toLowerCase();
+        // Skip objects that shouldn't affect grounding (same as initial calculation)
+        if (meshName.includes('icosphere') || meshName.includes('sphere')) {
+          return;
+        }
+        const meshBox = new THREE.Box3().setFromObject(child);
+        finalBox.union(meshBox);
+      }
+    });
+
+    // Fallback if no valid meshes found
+    if (finalBox.isEmpty()) {
+      finalBox.setFromObject(this.characterMesh);
+    }
+
     const finalSize = finalBox.getSize(new THREE.Vector3());
 
     // Correct Y position so model feet are at exactly Y=0
