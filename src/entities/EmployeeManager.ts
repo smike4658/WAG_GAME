@@ -191,6 +191,7 @@ export class EmployeeManager {
       // Get character model from CharacterLoader (or use fallback mesh)
       let characterModel: THREE.Group | undefined;
       let animations: THREE.AnimationClip[] | undefined;
+      let scaleOverride: number | undefined;
 
       // Debug: Check CharacterLoader state
       console.log(`[EmployeeManager] CharacterLoader initialized: ${this.characterLoader.isInitialized()}, loaded count: ${this.characterLoader.getLoadedCount()}`);
@@ -203,7 +204,8 @@ export class EmployeeManager {
       if (charLoaderModel) {
         characterModel = charLoaderModel;
         animations = this.characterLoader.getCharacterAnimations(data.roleId, gender);
-        console.log(`[EmployeeManager] Using custom model for ${data.roleId} with ${animations?.length ?? 0} animations`);
+        scaleOverride = this.characterLoader.getScaleOverride(data.roleId, gender);
+        console.log(`[EmployeeManager] Using custom model for ${data.roleId} with ${animations?.length ?? 0} animations, scaleOverride: ${scaleOverride ?? 'auto'}`);
       } else {
         // No model - Employee will use fallback mesh (cylinder + sphere)
         console.log(`[EmployeeManager] Using fallback mesh for ${data.roleId} (no model found)`);
@@ -215,7 +217,8 @@ export class EmployeeManager {
         employeeConfig,
         characterModel,
         animations,
-        getCityCollider()
+        getCityCollider(),
+        scaleOverride
       );
 
       // Set up callbacks
@@ -385,35 +388,54 @@ export class EmployeeManager {
 }
 
 /**
- * Default employee roster for the game
+ * Default employee roster for the game - WAG Team Members
+ * 24 real team members to hunt down!
  * Uses roleId to reference character models
  */
 export const DEFAULT_EMPLOYEES: EmployeeData[] = [
-  // Frontend Developers
-  { name: 'Karel Novák', role: 'Frontend Developer', roleId: 'frontend-developer', gender: 'male' },
-  { name: 'Eva Svobodová', role: 'Frontend Developer', roleId: 'frontend-developer', gender: 'female' },
+  // Developers (Blue) - 6 people
+  { name: 'Tomáš', role: 'Developer', roleId: 'developer', gender: 'male' },
+  { name: 'Michal', role: 'Developer', roleId: 'developer', gender: 'male' },
+  { name: 'Michal K.', role: 'Developer', roleId: 'developer', gender: 'male' },
+  { name: 'Jiří', role: 'Developer', roleId: 'developer', gender: 'male' },
+  { name: 'Honza', role: 'Developer', roleId: 'developer', gender: 'male' },
+  { name: 'Honza K.', role: 'Developer', roleId: 'developer', gender: 'male' },
 
-  // Backend Developers
-  { name: 'Tomáš Dvořák', role: 'Backend Developer', roleId: 'backend-developer', gender: 'male' },
-  { name: 'Lucie Černá', role: 'Backend Developer', roleId: 'backend-developer', gender: 'female' },
+  // Backend Developers (Green) - 3 people
+  { name: 'Michael', role: 'BE Developer', roleId: 'backend-developer', gender: 'male' },
+  { name: 'Teodor', role: 'BE Developer', roleId: 'backend-developer', gender: 'male' },
+  { name: 'Petr', role: 'BE Developer', roleId: 'backend-developer', gender: 'male' },
 
-  // UI/UX Designers
-  { name: 'Jana Procházková', role: 'UI/UX Designer', roleId: 'ui-ux-designer', gender: 'female' },
-  { name: 'Martin Kučera', role: 'UI/UX Designer', roleId: 'ui-ux-designer', gender: 'male' },
+  // Frontend/React Developers (Cyan) - 4 people
+  { name: 'Lucia', role: 'React Developer', roleId: 'frontend-developer', gender: 'female' },
+  { name: 'Lenka', role: 'React Developer', roleId: 'frontend-developer', gender: 'female' },
+  { name: 'Jiří R.', role: 'React Developer', roleId: 'frontend-developer', gender: 'male' },
 
-  // QA Testers
-  { name: 'Marie Veselá', role: 'QA Tester', roleId: 'qa-tester', gender: 'female' },
-  { name: 'Jakub Horák', role: 'QA Tester', roleId: 'qa-tester', gender: 'male' },
+  // Fullstack Developer (Teal) - 1 person
+  { name: 'Róbert', role: 'React / JAVA Developer', roleId: 'fullstack-developer', gender: 'male' },
 
-  // Business Analysts
-  { name: 'Petr Němec', role: 'Business Analyst', roleId: 'business-analyst', gender: 'male' },
-  { name: 'Tereza Marková', role: 'Business Analyst', roleId: 'business-analyst', gender: 'female' },
+  // QA/Testing (Orange) - 3 people
+  { name: 'Michal T.', role: 'Test Manager', roleId: 'qa-tester', gender: 'male' },
+  { name: 'Karolína', role: 'Test Lead', roleId: 'qa-tester', gender: 'female' },
+  { name: 'Jakub', role: 'QA Engineer', roleId: 'qa-tester', gender: 'male' },
 
-  // Product Owner
-  { name: 'Ondřej Poláček', role: 'Product Owner', roleId: 'product-owner', gender: 'male' },
+  // Product Owners (Red) - 2 people
+  { name: 'Marek', role: 'Product Owner', roleId: 'product-owner', gender: 'male' },
+  { name: 'Cyril', role: 'Product Owner', roleId: 'product-owner', gender: 'male' },
 
-  // DevOps (only male model)
-  { name: 'David Král', role: 'DevOps Engineer', roleId: 'devops', gender: 'male' },
+  // Business Analysts (Yellow) - 2 people
+  { name: 'Miloš', role: 'IT Business Analyst', roleId: 'business-analyst', gender: 'male' },
+  { name: 'Ivana', role: 'Business Analyst', roleId: 'business-analyst', gender: 'female' },
+
+  // UX Designers (Pink) - 2 people
+  { name: 'Honza D.', role: 'UX Designer', roleId: 'ux-designer', gender: 'male' },
+  { name: 'Hana', role: 'UX Designer', roleId: 'ux-designer', gender: 'female' },
+
+  // UI Designer (Magenta) - 1 person
+  { name: 'Adam', role: 'UI Designer', roleId: 'ui-designer', gender: 'male' },
+
+  // Solution Architect (Purple) - 1 person
+  { name: 'Tomáš A.', role: 'IT Solution Architect', roleId: 'solution-architect', gender: 'male' },
 ];
 
 /**

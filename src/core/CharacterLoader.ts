@@ -247,6 +247,17 @@ export class CharacterLoader {
   }
 
   /**
+   * Get scale override for a specific role and gender (if defined)
+   */
+  public getScaleOverride(roleId: string, gender: Gender): number | undefined {
+    const role = this.getRoleConfig(roleId);
+    if (!role) return undefined;
+
+    const modelConfig = role.models[gender];
+    return modelConfig?.scaleOverride;
+  }
+
+  /**
    * Get all available roles
    */
   public getAllRoles(): RoleConfig[] {

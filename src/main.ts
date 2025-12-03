@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { InputManager } from './core/InputManager';
 import { Player } from './entities/Player';
 import { EmployeeManager, DEFAULT_EMPLOYEES } from './entities/EmployeeManager';
@@ -30,6 +31,7 @@ import { ScreenEffects } from './ui/ScreenEffects';
 
 class Game {
   private readonly renderer: THREE.WebGLRenderer;
+  private readonly labelRenderer: CSS2DRenderer;
   private readonly scene: THREE.Scene;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly inputManager: InputManager;
@@ -84,6 +86,14 @@ class Game {
     const app = document.getElementById('app');
     if (!app) throw new Error('App container not found');
     app.appendChild(this.renderer.domElement);
+
+    // Create CSS2D renderer for labels
+    this.labelRenderer = new CSS2DRenderer();
+    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    this.labelRenderer.domElement.style.position = 'absolute';
+    this.labelRenderer.domElement.style.top = '0';
+    this.labelRenderer.domElement.style.pointerEvents = 'none';
+    app.appendChild(this.labelRenderer.domElement);
 
     // Create scene
     this.scene = new THREE.Scene();
@@ -343,6 +353,7 @@ class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
   }
 
   /**
@@ -855,6 +866,7 @@ class Game {
     }
 
     this.renderer.render(this.scene, this.camera);
+    this.labelRenderer.render(this.scene, this.camera);
   };
 }
 

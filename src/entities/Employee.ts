@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { type Gender } from '../config/characters';
 import type { CityCollider } from '../world/collision/CityCollider';
+import { NameLabel } from '../ui/NameLabel';
 
 /**
  * Employee states for AI behavior
@@ -136,13 +137,17 @@ export class Employee {
   private hasRefusedThisNight = false;
   private sleepIndicator: THREE.Sprite | null = null;
 
+  // Name label
+  private nameLabel: NameLabel | null = null;
+
   constructor(
     id: string,
     position: THREE.Vector3,
     config: Partial<EmployeeConfig> & { name: string; role: string; roleId: string; gender: Gender },
     characterModel?: THREE.Group,
     animations?: THREE.AnimationClip[],
-    collider: CityCollider | null = null
+    collider: CityCollider | null = null,
+    scaleOverride?: number
   ) {
     this.id = id;
     this.collider = collider;
@@ -177,7 +182,7 @@ export class Employee {
 
     // Use provided 3D character model or create fallback
     if (characterModel) {
-      this.setupCharacterModel(characterModel);
+      this.setupCharacterModel(characterModel, scaleOverride);
       if (animations && animations.length > 0) {
         this.setupAnimations(animations);
       }
@@ -200,6 +205,10 @@ export class Employee {
     // Random initial rotation
     this.mesh.rotation.y = Math.random() * Math.PI * 2;
 
+    // Create name label
+    this.nameLabel = new NameLabel(this.config.name, this.config.role);
+    this.mesh.add(this.nameLabel.getLabel());
+
     console.log(`[Employee] ${this.config.name} personality: ${this.config.personality} (detection: ${this.config.detectionRadius}m, flee: ${this.config.fleeRadius}m)`);
   }
 
@@ -213,7 +222,7 @@ export class Employee {
   /**
    * Setup the 3D character model
    */
-  private setupCharacterModel(model: THREE.Group): void {
+  private setupCharacterModel(model: THREE.Group, scaleOverride?: number): void {
     // Create a wrapper group for the character
     this.characterMesh = new THREE.Group();
     this.characterMesh.name = 'character_wrapper';
@@ -229,18 +238,41 @@ export class Employee {
     // Update all matrices recursively
     model.updateMatrixWorld(true);
 
-    // Calculate bounds from the model
-    const box = new THREE.Box3().setFromObject(model);
+    // Calculate bounds from the model, excluding non-character objects (Icospheres, etc.)
+    // These extra objects from Sketchfab models inflate the bounding box incorrectly
+    const box = new THREE.Box3();
+    model.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        // Skip objects that shouldn't be included in character bounds
+        const name = child.name.toLowerCase();
+        if (name.includes('icosphere') || name.includes('sphere')) {
+          return;
+        }
+        // Expand box to include this mesh
+        const meshBox = new THREE.Box3().setFromObject(child);
+        box.union(meshBox);
+      }
+    });
+
+    // Fallback if no valid meshes found
+    if (box.isEmpty()) {
+      box.setFromObject(model);
+    }
+
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
 
-    // Target height ~1.7m (human scale)
-    const targetHeight = 1.7;
-
-    // Calculate scale factor
-    const scale = targetHeight / size.y;
-
-    console.log(`[Employee] ${this.config.name} - original size: ${size.y.toFixed(2)}m, scale factor: ${scale.toFixed(6)}, center: ${center.x.toFixed(1)}, ${center.y.toFixed(1)}, ${center.z.toFixed(1)}`);
+    // Determine scale factor: use override if provided, otherwise auto-calculate
+    let scale: number;
+    if (scaleOverride !== undefined) {
+      scale = scaleOverride;
+      console.log(`[Employee] ${this.config.name} - using scale override: ${scale.toFixed(6)}`);
+    } else {
+      // Target height ~1.7m (human scale)
+      const targetHeight = 1.7;
+      scale = targetHeight / size.y;
+      console.log(`[Employee] ${this.config.name} - original size: ${size.y.toFixed(2)}m, scale factor: ${scale.toFixed(6)}, center: ${center.x.toFixed(1)}, ${center.y.toFixed(1)}, ${center.z.toFixed(1)}`);
+    }
 
     // Apply scale to the inner model
     model.scale.set(scale, scale, scale);
@@ -741,6 +773,11 @@ export class Employee {
       this.mixer.update(deltaTime);
     }
 
+    // Update name label visibility
+    if (this.nameLabel) {
+      this.nameLabel.updateVisibility(distanceToPlayer);
+    }
+
     // Update programmatic animation (bobbing, tilting)
     this.updateProceduralAnimation(deltaTime);
   }
@@ -1025,6 +1062,12 @@ export class Employee {
    * Clean up resources
    */
   public dispose(): void {
+    // Dispose name label
+    if (this.nameLabel) {
+      this.nameLabel.dispose();
+      this.nameLabel = null;
+    }
+
     // Dispose sleep indicator
     this.hideSleepIndicator();
 

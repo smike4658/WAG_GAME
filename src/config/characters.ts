@@ -13,6 +13,8 @@ export interface CharacterModel {
   rigged: boolean;
   /** Custom model with named animations (Idle, Walk, Run, Flee) */
   hasNamedAnimations?: boolean;
+  /** Manual scale override (bypasses auto-scaling) - use for models with incorrect bounding boxes */
+  scaleOverride?: number;
 }
 
 export interface RoleConfig {
@@ -33,8 +35,48 @@ export interface NPCPackConfig {
 
 /**
  * Employee roles with their character models
+ *
+ * Role groupings based on team:
+ * - Developer (blue): Generic developers
+ * - Frontend Developer (cyan): React/Frontend devs
+ * - Backend Developer (green): BE developers
+ * - Fullstack Developer (teal): React/JAVA devs
+ * - QA/Testing (orange): QA engineers, Test leads, Test managers
+ * - Product Owner (red): Product owners
+ * - Business Analyst (yellow): BA, IT BA
+ * - UX Designer (pink): UX designers
+ * - UI Designer (magenta): UI designers
+ * - Solution Architect (purple): IT Solution Architects
  */
 export const EMPLOYEE_ROLES: RoleConfig[] = [
+  // Generic Developer - blue baseball cap accessory
+  {
+    id: 'developer',
+    displayName: 'Developer',
+    displayNameCz: 'Vývojář',
+    genders: ['male', 'female'],
+    models: {
+      male: {
+        path: 'assets/models/developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Developer (Baseball Cap)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Developer (Baseball Cap)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+    },
+  },
+  // Frontend/React Developer - cyan headphones accessory
   {
     id: 'frontend-developer',
     displayName: 'Frontend Developer',
@@ -42,116 +84,238 @@ export const EMPLOYEE_ROLES: RoleConfig[] = [
     genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/developer_npc.glb',
-        sketchfabId: 'custom-blender-model',
-        name: 'Developer NPC (Animated)',
+        path: 'assets/models/frontend-developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Frontend Developer (Headphones)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
       female: {
-        path: 'assets/models/developer_npc.glb',
-        sketchfabId: 'custom-blender-model',
-        name: 'Developer NPC (Animated)',
+        path: 'assets/models/female-frontend-developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Female Frontend Developer (Headphones)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
+  // Backend Developer - green backpack accessory
   {
     id: 'backend-developer',
     displayName: 'Backend Developer',
     displayNameCz: 'Backend Vývojář',
-    genders: ['male'],
+    genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/backend-developer.glb',
-        sketchfabId: 'stylized-variant',
-        name: 'Backend Developer (Animated)',
+        path: 'assets/models/backend-developer-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Backend Developer (Backpack)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/backend-developer-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Backend Developer (Backpack)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
+  // Fullstack Developer - teal laptop bag accessory
   {
-    id: 'ui-ux-designer',
-    displayName: 'UI/UX Designer',
-    displayNameCz: 'UI/UX Designér',
-    genders: ['male'],
+    id: 'fullstack-developer',
+    displayName: 'Fullstack Developer',
+    displayNameCz: 'Fullstack Vývojář',
+    genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/ui-ux-designer.glb',
-        sketchfabId: 'stylized-variant',
-        name: 'UI/UX Designer (Animated)',
+        path: 'assets/models/fullstack-developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Fullstack Developer (Laptop Bag)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/fullstack-developer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Fullstack Developer (Laptop Bag)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
+  // QA/Testing - orange clipboard accessory (covers QA Engineer, Test Lead, Test Manager)
   {
     id: 'qa-tester',
-    displayName: 'QA Tester',
+    displayName: 'QA Engineer',
     displayNameCz: 'QA Tester',
-    genders: ['male'],
+    genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/qa-tester.glb',
-        sketchfabId: 'stylized-variant',
-        name: 'QA Tester (Animated)',
+        path: 'assets/models/qa-tester-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'QA Tester (Clipboard)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
-    },
-  },
-  {
-    id: 'business-analyst',
-    displayName: 'Business Analyst',
-    displayNameCz: 'Business Analytik',
-    genders: ['male'],
-    models: {
-      male: {
-        path: 'assets/models/business-analyst.glb',
-        sketchfabId: 'stylized-variant',
-        name: 'Business Analyst (Animated)',
+      female: {
+        path: 'assets/models/female-qa-tester.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Female QA Tester (Clipboard)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
+  // Product Owner - red briefcase accessory
   {
     id: 'product-owner',
     displayName: 'Product Owner',
     displayNameCz: 'Product Owner',
-    genders: ['male'],
+    genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/product-owner.glb',
-        sketchfabId: 'custom-blender-model',
-        name: 'Product Owner (Animated)',
+        path: 'assets/models/product-owner-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Product Owner (Briefcase)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/product-owner-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Product Owner (Briefcase)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
+  // Business Analyst - yellow folder accessory
   {
-    id: 'devops',
-    displayName: 'DevOps Engineer',
-    displayNameCz: 'DevOps Inženýr',
-    genders: ['male'],
+    id: 'business-analyst',
+    displayName: 'Business Analyst',
+    displayNameCz: 'Business Analytik',
+    genders: ['male', 'female'],
     models: {
       male: {
-        path: 'assets/models/devops.glb',
-        sketchfabId: 'stylized-variant',
-        name: 'DevOps Engineer (Animated)',
+        path: 'assets/models/business-analyst-new.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Business Analyst (Folder)',
         animated: true,
         rigged: true,
         hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/female-business-analyst.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Female Business Analyst (Folder)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+    },
+  },
+  // UX Designer - pink tablet accessory
+  {
+    id: 'ux-designer',
+    displayName: 'UX Designer',
+    displayNameCz: 'UX Designér',
+    genders: ['male', 'female'],
+    models: {
+      male: {
+        path: 'assets/models/ux-designer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'UX Designer (Tablet)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/female-ux-designer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Female UX Designer (Tablet)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+    },
+  },
+  // UI Designer - magenta color palette accessory
+  {
+    id: 'ui-designer',
+    displayName: 'UI Designer',
+    displayNameCz: 'UI Designér',
+    genders: ['male', 'female'],
+    models: {
+      male: {
+        path: 'assets/models/ui-designer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'UI Designer (Color Palette)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/ui-designer.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'UI Designer (Color Palette)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+    },
+  },
+  // Solution Architect - purple blueprints accessory
+  {
+    id: 'solution-architect',
+    displayName: 'Solution Architect',
+    displayNameCz: 'Solution Architekt',
+    genders: ['male', 'female'],
+    models: {
+      male: {
+        path: 'assets/models/solution-architect.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Solution Architect (Blueprints)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
+      },
+      female: {
+        path: 'assets/models/solution-architect.glb',
+        sketchfabId: 'custom-accessory-model',
+        name: 'Solution Architect (Blueprints)',
+        animated: true,
+        rigged: true,
+        hasNamedAnimations: true,
+        scaleOverride: 0.15,
       },
     },
   },
