@@ -98,12 +98,12 @@ interface PowerupConfig {
 }
 
 const DEFAULT_CONFIG: PowerupConfig = {
-  effectDuration: 10,
-  spawnDuration: 10,
-  respawnDelay: 5,
-  pickupRadius: 2,
+  effectDuration: 5,   // Shorter boost duration for faster gameplay
+  spawnDuration: 8,    // Shorter spawn time
+  respawnDelay: 3,     // Faster respawn
+  pickupRadius: 2.5,   // Slightly larger pickup radius
   floatHeight: 1.5,
-  rotationSpeed: 2,
+  rotationSpeed: 3,    // Faster rotation
 };
 
 /**
@@ -195,11 +195,20 @@ export class PowerupManager {
     const offsetX = centerOffset?.[0] ?? 0;
     const offsetZ = centerOffset?.[1] ?? 0;
 
-    // 3 spawn locations: offset center + 2 nearby positions
+    // 9 spawn locations spread across the map for more powerup action
     const positions = [
-      new THREE.Vector3(centerX + offsetX, 0, centerZ + offsetZ),                             // Offset center
-      new THREE.Vector3(centerX + offsetX + width * 0.1, 0, centerZ + offsetZ + depth * 0.1), // Near center 1
-      new THREE.Vector3(centerX + offsetX - width * 0.1, 0, centerZ + offsetZ - depth * 0.1), // Near center 2
+      // Center area (offset to avoid props)
+      new THREE.Vector3(centerX + offsetX, 0, centerZ + offsetZ),
+      // Inner ring - 4 positions
+      new THREE.Vector3(centerX + width * 0.15, 0, centerZ),
+      new THREE.Vector3(centerX - width * 0.15, 0, centerZ),
+      new THREE.Vector3(centerX, 0, centerZ + depth * 0.15),
+      new THREE.Vector3(centerX, 0, centerZ - depth * 0.15),
+      // Outer ring - 4 positions
+      new THREE.Vector3(centerX + width * 0.3, 0, centerZ + depth * 0.3),
+      new THREE.Vector3(centerX - width * 0.3, 0, centerZ + depth * 0.3),
+      new THREE.Vector3(centerX + width * 0.3, 0, centerZ - depth * 0.3),
+      new THREE.Vector3(centerX - width * 0.3, 0, centerZ - depth * 0.3),
     ];
 
     console.log(`[PowerupManager] Center offset applied: [${offsetX}, ${offsetZ}]`);
@@ -214,7 +223,7 @@ export class PowerupManager {
       });
     }
 
-    console.log('[PowerupManager] Initialized with 3 spawn locations');
+    console.log('[PowerupManager] Initialized with 9 spawn locations');
 
     // Spawn first powerup
     this.spawnPowerup();

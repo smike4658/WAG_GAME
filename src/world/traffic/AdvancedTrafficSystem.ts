@@ -75,14 +75,14 @@ interface AdvancedTrafficConfig {
 }
 
 const DEFAULT_CONFIG: AdvancedTrafficConfig = {
-  maxVehicles: 50,
-  spawnInterval: 2,
-  minSpawnGap: 10,
-  arrivalThreshold: 3.5, // Increased from 2 for smoother waypoint transitions
-  laneOffset: 2.5, // 2.5 units to the right
-  rotationSmoothing: 0.08, // Smooth rotation (lower = smoother, 0.08 = ~12 frames to full turn)
-  waypointCommitmentDuration: 0.5, // 500ms commitment to waypoint decision
-  stuckTimeout: 3.0, // 3 seconds before forcing through intersection
+  maxVehicles: 150,     // 3x more vehicles for busier streets
+  spawnInterval: 1,     // Faster spawning
+  minSpawnGap: 8,       // Slightly tighter gaps
+  arrivalThreshold: 3.5,
+  laneOffset: 2.5,
+  rotationSmoothing: 0.08,
+  waypointCommitmentDuration: 0.5,
+  stuckTimeout: 3.0,
 };
 
 /**

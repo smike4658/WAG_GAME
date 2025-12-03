@@ -47,7 +47,7 @@ export const LEVELS: LevelConfig[] = [
     simpleConfig: {
       size: new THREE.Vector2(200, 200),
       roadWidth: 10,
-      carCount: 15,
+      carCount: 45,  // 3x more cars
       debugRoads: true,
     },
   },

@@ -27,9 +27,9 @@ interface PersonalityConfig {
  * Personality presets
  */
 const PERSONALITIES: Record<PersonalityType, PersonalityConfig> = {
-  paranoid: { detectionRadius: 37.5, fleeRadius: 27, runSpeed: 7, panicDuration: 0.3 },
-  normal: { detectionRadius: 22.5, fleeRadius: 18, runSpeed: 6, panicDuration: 0.4 },
-  dreamy: { detectionRadius: 15, fleeRadius: 12, runSpeed: 5.5, panicDuration: 0.6 },
+  paranoid: { detectionRadius: 37.5, fleeRadius: 27, runSpeed: 10, panicDuration: 0.2 },
+  normal: { detectionRadius: 22.5, fleeRadius: 18, runSpeed: 9, panicDuration: 0.25 },
+  dreamy: { detectionRadius: 15, fleeRadius: 12, runSpeed: 8, panicDuration: 0.35 },
 };
 
 /**
@@ -63,11 +63,11 @@ export interface EmployeeConfig {
 }
 
 const DEFAULT_CONFIG: Omit<EmployeeConfig, 'name' | 'role' | 'roleId' | 'gender' | 'color' | 'personality'> = {
-  walkSpeed: 2,
-  runSpeed: 6,
-  detectionRadius: 22.5,  // Increased 50% from 15
-  fleeRadius: 18,         // Increased 50% from 12
-  panicDuration: 0.4,
+  walkSpeed: 3,
+  runSpeed: 9,
+  detectionRadius: 22.5,
+  fleeRadius: 18,
+  panicDuration: 0.25,
 };
 
 /**
