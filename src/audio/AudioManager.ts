@@ -59,6 +59,13 @@ const VOICE_CLIPS: VoiceClip[] = [
   { id: 'ux2', role: 'designer', text: 'Ne ne ne!', file: 'ux_ne.mp3' },
   { id: 'ux3', role: 'designer', text: 'Wireframe!', file: 'ux_wireframe.mp3' },
 
+  // Ostrava slang - fleeing phrases (used randomly when any employee flees)
+  { id: 'flee1', role: 'flee', text: 'Kurňa, ještě jsem nepushnul!', file: 'flee_ostrava1.mp3' },
+  { id: 'flee2', role: 'flee', text: 'Pyčo, ten deploy!', file: 'flee_ostrava2.mp3' },
+  { id: 'flee3', role: 'flee', text: 'Tyjo, mam tam bug jak baňa!', file: 'flee_ostrava3.mp3' },
+  { id: 'flee4', role: 'flee', text: 'Furt debuguju, nech mě!', file: 'flee_ostrava4.mp3' },
+  { id: 'flee5', role: 'flee', text: 'Do šaliny a pryč!', file: 'flee_ostrava5.mp3' },
+
   // Player exhaustion (sprint)
   { id: 'exhaust1', role: 'player', text: 'Už nemůžu!', file: 'player_exhaust1.mp3' },
   { id: 'exhaust2', role: 'player', text: 'Dej mi chvilku...', file: 'player_exhaust2.mp3' },
@@ -275,11 +282,28 @@ export class AudioManager {
 
   /**
    * Play a random voice clip for a role at a position
+   * 40% chance to use Ostrava slang phrases instead of role-specific ones
    */
   public playVoiceClip(role: string, position: THREE.Vector3): void {
     if (!this.enabled) return;
 
-    // Normalize role name
+    // 40% chance to use Ostrava slang flee phrases
+    const useOstravaSlang = Math.random() < 0.4;
+    const fleeClips = this.clipsByRole.get('flee');
+
+    if (useOstravaSlang && fleeClips && fleeClips.length > 0) {
+      const clip = fleeClips[Math.floor(Math.random() * fleeClips.length)]!;
+
+      if (!this.sounds.has(clip.id)) {
+        console.log(`[Scream] ${role} (ostravsky): "${clip.text}"`);
+        return;
+      }
+
+      this.playSoundAtPosition(clip.id, position, 2.0);
+      return;
+    }
+
+    // Normalize role name for role-specific clips
     const normalizedRole = this.normalizeRole(role);
     const clips = this.clipsByRole.get(normalizedRole);
 
@@ -298,7 +322,8 @@ export class AudioManager {
       return;
     }
 
-    this.playSoundAtPosition(clip.id, position);
+    // NPC voices use 2x volume multiplier for better audibility
+    this.playSoundAtPosition(clip.id, position, 2.0);
   }
 
   /**
@@ -320,8 +345,9 @@ export class AudioManager {
 
   /**
    * Play a sound at a 3D position
+   * @param volumeMultiplier - Optional multiplier for volume (default 1.0)
    */
-  public playSoundAtPosition(soundId: string, position: THREE.Vector3): void {
+  public playSoundAtPosition(soundId: string, position: THREE.Vector3, volumeMultiplier: number = 1.0): void {
     if (!this.enabled) return;
 
     const sound = this.sounds.get(soundId);
@@ -333,7 +359,8 @@ export class AudioManager {
     // Calculate distance-based volume
     const distance = this.listenerPosition.distanceTo(position);
     const maxDistance = 50;
-    const volume = Math.max(0, 1 - distance / maxDistance);
+    const baseVolume = Math.max(0, 1 - distance / maxDistance);
+    const volume = Math.min(1, baseVolume * volumeMultiplier); // Apply multiplier, clamp to max 1
 
     if (volume <= 0) return; // Too far to hear
 
@@ -417,8 +444,8 @@ export class AudioManager {
       return;
     }
 
-    // Play at employee position
-    this.playSoundAtPosition(clip.id, position);
+    // Play at employee position with 2x volume for NPC audibility
+    this.playSoundAtPosition(clip.id, position, 2.0);
   }
 
   /**
