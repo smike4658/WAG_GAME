@@ -75,9 +75,9 @@ interface AdvancedTrafficConfig {
 }
 
 const DEFAULT_CONFIG: AdvancedTrafficConfig = {
-  maxVehicles: 150,     // 3x more vehicles for busier streets
-  spawnInterval: 1,     // Faster spawning
-  minSpawnGap: 8,       // Slightly tighter gaps
+  maxVehicles: 50,
+  spawnInterval: 2,
+  minSpawnGap: 10,
   arrivalThreshold: 3.5,
   laneOffset: 2.5,
   rotationSmoothing: 0.08,
