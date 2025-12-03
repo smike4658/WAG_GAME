@@ -277,7 +277,7 @@ export class Employee {
     // Apply scale to the inner model
     model.scale.set(scale, scale, scale);
 
-    // Center the model - move it so the center is at origin and feet at y=0
+    // Initial centering - move model so center is at origin
     model.position.set(
       -center.x * scale,
       -box.min.y * scale,
@@ -287,10 +287,19 @@ export class Employee {
     // Add wrapper to main mesh
     this.mesh.add(this.characterMesh);
 
-    // Verify final bounds
+    // IMPORTANT: Recalculate bounding box after scaling and positioning
+    // to ensure feet are exactly at Y=0 (fixes floating character issue)
     this.characterMesh.updateMatrixWorld(true);
     const finalBox = new THREE.Box3().setFromObject(this.characterMesh);
     const finalSize = finalBox.getSize(new THREE.Vector3());
+
+    // Correct Y position so model feet are at exactly Y=0
+    const yCorrection = -finalBox.min.y;
+    if (Math.abs(yCorrection) > 0.001) {
+      model.position.y += yCorrection;
+      console.log(`[Employee] ${this.config.name} - Y correction applied: ${yCorrection.toFixed(3)}m`);
+    }
+
     console.log(`[Employee] ${this.config.name} - final size: ${finalSize.y.toFixed(2)}m`);
 
     // Apply role-based tint to materials (subtle)
