@@ -27,9 +27,9 @@ interface PersonalityConfig {
  * Personality presets
  */
 const PERSONALITIES: Record<PersonalityType, PersonalityConfig> = {
-  paranoid: { detectionRadius: 25, fleeRadius: 18, runSpeed: 7, panicDuration: 0.3 },
-  normal: { detectionRadius: 15, fleeRadius: 12, runSpeed: 6, panicDuration: 0.4 },
-  dreamy: { detectionRadius: 10, fleeRadius: 8, runSpeed: 5.5, panicDuration: 0.6 },
+  paranoid: { detectionRadius: 37.5, fleeRadius: 27, runSpeed: 7, panicDuration: 0.3 },
+  normal: { detectionRadius: 22.5, fleeRadius: 18, runSpeed: 6, panicDuration: 0.4 },
+  dreamy: { detectionRadius: 15, fleeRadius: 12, runSpeed: 5.5, panicDuration: 0.6 },
 };
 
 /**
@@ -65,8 +65,8 @@ export interface EmployeeConfig {
 const DEFAULT_CONFIG: Omit<EmployeeConfig, 'name' | 'role' | 'roleId' | 'gender' | 'color' | 'personality'> = {
   walkSpeed: 2,
   runSpeed: 6,
-  detectionRadius: 15,
-  fleeRadius: 12,
+  detectionRadius: 22.5,  // Increased 50% from 15
+  fleeRadius: 18,         // Increased 50% from 12
   panicDuration: 0.4,
 };
 
@@ -992,23 +992,176 @@ export class Employee {
   }
 
   /**
-   * Fleeing behavior - run away from player
+   * Fleeing behavior - smart escape that avoids walls and map edges
    */
   private updateFleeing(_deltaTime: number, playerPosition: THREE.Vector3): void {
-    // Direction away from player
-    const awayFromPlayer = this.mesh.position.clone().sub(playerPosition);
+    const currentPos = this.mesh.position.clone();
+
+    // Get map bounds for edge awareness
+    const bounds = this.collider?.getBounds();
+    const mapCenter = bounds
+      ? new THREE.Vector3(
+          (bounds.min.x + bounds.max.x) / 2,
+          0,
+          (bounds.min.z + bounds.max.z) / 2
+        )
+      : new THREE.Vector3(0, 0, 0);
+
+    // Calculate base direction away from player
+    const awayFromPlayer = currentPos.clone().sub(playerPosition);
     awayFromPlayer.y = 0;
 
-    if (awayFromPlayer.length() > 0.1) {
-      awayFromPlayer.normalize();
-
-      // Add some randomness to avoid predictable paths
-      awayFromPlayer.x += (Math.random() - 0.5) * 0.3;
-      awayFromPlayer.z += (Math.random() - 0.5) * 0.3;
-      awayFromPlayer.normalize();
-
-      this.velocity.copy(awayFromPlayer.multiplyScalar(this.config.runSpeed));
+    if (awayFromPlayer.length() < 0.1) {
+      // Player is on top of us, pick random direction
+      awayFromPlayer.set(Math.random() - 0.5, 0, Math.random() - 0.5);
     }
+    awayFromPlayer.normalize();
+
+    // Sample multiple escape directions and pick the best one
+    const bestDirection = this.findBestEscapeDirection(
+      currentPos,
+      playerPosition,
+      awayFromPlayer,
+      mapCenter,
+      bounds
+    );
+
+    this.velocity.copy(bestDirection.multiplyScalar(this.config.runSpeed));
+  }
+
+  /**
+   * Find the best escape direction by sampling multiple options
+   */
+  private findBestEscapeDirection(
+    currentPos: THREE.Vector3,
+    playerPos: THREE.Vector3,
+    awayFromPlayer: THREE.Vector3,
+    mapCenter: THREE.Vector3,
+    bounds: THREE.Box3 | undefined
+  ): THREE.Vector3 {
+    // Sample 8 directions: away from player + 7 variations
+    const candidates: { direction: THREE.Vector3; score: number }[] = [];
+
+    // Direction toward map center
+    const toCenter = mapCenter.clone().sub(currentPos);
+    toCenter.y = 0;
+    toCenter.normalize();
+
+    // Check how close we are to edges
+    const edgeMargin = 15; // Start worrying about edges at 15m
+    const edgeProximity = this.getEdgeProximity(currentPos, bounds, edgeMargin);
+
+    // Sample directions: -90° to +90° from "away from player"
+    for (let angleOffset = -90; angleOffset <= 90; angleOffset += 30) {
+      const radians = (angleOffset * Math.PI) / 180;
+      const direction = this.rotateVector(awayFromPlayer.clone(), radians);
+
+      const score = this.scoreEscapeDirection(
+        currentPos,
+        playerPos,
+        direction,
+        toCenter,
+        bounds,
+        edgeProximity
+      );
+
+      candidates.push({ direction, score });
+    }
+
+    // Sort by score (higher is better) and pick the best
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Add small randomness to the best direction to avoid robotic movement
+    const best = candidates[0]!.direction;
+    best.x += (Math.random() - 0.5) * 0.15;
+    best.z += (Math.random() - 0.5) * 0.15;
+    best.normalize();
+
+    return best;
+  }
+
+  /**
+   * Score an escape direction (higher is better)
+   */
+  private scoreEscapeDirection(
+    currentPos: THREE.Vector3,
+    playerPos: THREE.Vector3,
+    direction: THREE.Vector3,
+    toCenter: THREE.Vector3,
+    bounds: THREE.Box3 | undefined,
+    edgeProximity: number
+  ): number {
+    let score = 0;
+
+    // 1. Prefer directions away from player (dot product with away direction)
+    const awayFromPlayer = currentPos.clone().sub(playerPos).normalize();
+    const awayScore = direction.dot(awayFromPlayer);
+    score += awayScore * 50; // Strong preference to run away
+
+    // 2. Avoid edges - prefer directions toward center when near edges
+    if (edgeProximity > 0 && bounds) {
+      // The closer to edge, the more we prefer moving toward center
+      const centerScore = direction.dot(toCenter);
+      score += centerScore * edgeProximity * 40; // Scale by how close to edge
+    }
+
+    // 3. Check if this direction leads into a wall (look ahead)
+    if (this.collider && bounds) {
+      const lookAhead = 5; // Check 5m ahead
+      const futurePos = currentPos.clone().add(direction.clone().multiplyScalar(lookAhead));
+
+      // Check if future position is outside bounds
+      if (!bounds.containsPoint(futurePos)) {
+        score -= 100; // Heavy penalty for running into boundary
+      }
+
+      // Check for obstacle collision
+      const collisionCheck = futurePos.clone();
+      collisionCheck.y = 1.0; // Waist height
+      const adjusted = this.collider.checkMovement(
+        currentPos.clone().setY(1.0),
+        collisionCheck,
+        0.5
+      );
+
+      // If adjusted position is much closer than desired, there's an obstacle
+      const actualDistance = adjusted.distanceTo(currentPos.clone().setY(1.0));
+      if (actualDistance < lookAhead * 0.5) {
+        score -= 60; // Penalty for obstacles
+      }
+    }
+
+    return score;
+  }
+
+  /**
+   * Get how close we are to any edge (0 = not near, 1 = at edge)
+   */
+  private getEdgeProximity(pos: THREE.Vector3, bounds: THREE.Box3 | undefined, margin: number): number {
+    if (!bounds) return 0;
+
+    const distToMinX = pos.x - bounds.min.x;
+    const distToMaxX = bounds.max.x - pos.x;
+    const distToMinZ = pos.z - bounds.min.z;
+    const distToMaxZ = bounds.max.z - pos.z;
+
+    const minDist = Math.min(distToMinX, distToMaxX, distToMinZ, distToMaxZ);
+
+    if (minDist >= margin) return 0;
+    return 1 - (minDist / margin); // 0 at margin distance, 1 at edge
+  }
+
+  /**
+   * Rotate a vector around Y axis
+   */
+  private rotateVector(v: THREE.Vector3, radians: number): THREE.Vector3 {
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+    return new THREE.Vector3(
+      v.x * cos - v.z * sin,
+      0,
+      v.x * sin + v.z * cos
+    );
   }
 
   /**
