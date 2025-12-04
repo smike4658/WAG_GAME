@@ -238,24 +238,43 @@ export class Employee {
     // Update all matrices recursively
     model.updateMatrixWorld(true);
 
-    // Calculate bounds from the model, excluding non-character objects (Icospheres, etc.)
-    // These extra objects from Sketchfab models inflate the bounding box incorrectly
+    // Calculate bounds from the model, excluding non-character objects
+    // Many 3D models have helper objects, particles, or effects that inflate bounds
     const box = new THREE.Box3();
+    let validMeshCount = 0;
+
     model.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        // Skip objects that shouldn't be included in character bounds
+      if (child instanceof THREE.Mesh && child.geometry) {
         const name = child.name.toLowerCase();
-        if (name.includes('icosphere') || name.includes('sphere')) {
+
+        // Skip objects that shouldn't be included in character bounds
+        const excludePatterns = [
+          'icosphere', 'sphere', 'helper', 'particle', 'effect',
+          'light', 'camera', 'target', 'bone', 'armature', 'rig',
+          'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
+          'shadow', 'ground_shadow', 'floor_shadow'
+        ];
+
+        const shouldExclude = excludePatterns.some(pattern => name.includes(pattern));
+        if (shouldExclude) {
           return;
         }
+
+        // Skip meshes that are very small (likely helpers) or invisible
+        if (!child.visible) return;
+
         // Expand box to include this mesh
         const meshBox = new THREE.Box3().setFromObject(child);
-        box.union(meshBox);
+        if (!meshBox.isEmpty()) {
+          box.union(meshBox);
+          validMeshCount++;
+        }
       }
     });
 
     // Fallback if no valid meshes found
-    if (box.isEmpty()) {
+    if (box.isEmpty() || validMeshCount === 0) {
+      console.warn(`[Employee] ${this.config.name} - no valid meshes found, using full model bounds`);
       box.setFromObject(model);
     }
 
@@ -292,20 +311,33 @@ export class Employee {
     // Use the same exclusion logic as the initial bounds calculation
     this.characterMesh.updateMatrixWorld(true);
     const finalBox = new THREE.Box3();
+    let finalValidMeshCount = 0;
+
+    // Exclusion patterns for non-character geometry
+    const excludePatterns = [
+      'icosphere', 'sphere', 'helper', 'particle', 'effect',
+      'light', 'camera', 'target', 'bone', 'armature', 'rig',
+      'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
+      'shadow', 'ground_shadow', 'floor_shadow'
+    ];
+
     model.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
+      if (child instanceof THREE.Mesh && child.geometry && child.visible) {
         const meshName = child.name.toLowerCase();
-        // Skip objects that shouldn't affect grounding (same as initial calculation)
-        if (meshName.includes('icosphere') || meshName.includes('sphere')) {
+        const shouldExclude = excludePatterns.some(pattern => meshName.includes(pattern));
+        if (shouldExclude) {
           return;
         }
         const meshBox = new THREE.Box3().setFromObject(child);
-        finalBox.union(meshBox);
+        if (!meshBox.isEmpty()) {
+          finalBox.union(meshBox);
+          finalValidMeshCount++;
+        }
       }
     });
 
     // Fallback if no valid meshes found
-    if (finalBox.isEmpty()) {
+    if (finalBox.isEmpty() || finalValidMeshCount === 0) {
       finalBox.setFromObject(this.characterMesh);
     }
 

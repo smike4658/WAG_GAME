@@ -179,12 +179,16 @@ export class TrafficSystem {
       // Get vehicle type from name
       const vehicleType = this.extractVehicleType(name);
 
-      // Calculate initial direction from bounding box
-      const initialDir = this.calculateForwardDirection(child);
+      // Calculate initial direction from the mesh's CURRENT rotation
+      // This ensures movement matches the car's visual orientation
+      const initialDir = this.getForwardFromRotation(child);
 
       // Randomly flip direction 50% of the time
       if (Math.random() > 0.5) {
         initialDir.negate();
+        // Update mesh rotation to match the flipped direction
+        const angle = Math.atan2(initialDir.x, initialDir.z);
+        child.rotation.y = angle;
       }
 
       // Random speed based on vehicle type
@@ -221,29 +225,28 @@ export class TrafficSystem {
   }
 
   /**
-   * Calculate forward direction from mesh bounding box
-   * Cars are longer than wide, so longest horizontal axis is forward
+   * Get forward direction from mesh's current rotation
+   * In Three.js, default forward is +Z (0, 0, 1), rotation.y rotates around Y axis
    */
-  private calculateForwardDirection(mesh: THREE.Object3D): THREE.Vector3 {
-    // Create bounding box from mesh
-    const box = new THREE.Box3().setFromObject(mesh);
-    const size = box.getSize(new THREE.Vector3());
+  private getForwardFromRotation(mesh: THREE.Object3D): THREE.Vector3 {
+    // Get the world rotation of the mesh
+    const worldQuaternion = new THREE.Quaternion();
+    mesh.getWorldQuaternion(worldQuaternion);
 
-    // Determine which horizontal axis is longer (that's the forward direction)
-    // X and Z are horizontal, Y is up
-    let forward: THREE.Vector3;
+    // Default forward direction in Three.js is +Z
+    const forward = new THREE.Vector3(0, 0, 1);
 
-    if (size.x > size.z) {
-      // Car is aligned with X axis
-      forward = new THREE.Vector3(1, 0, 0);
-    } else {
-      // Car is aligned with Z axis
-      forward = new THREE.Vector3(0, 0, 1);
+    // Apply the mesh's rotation to get actual forward direction
+    forward.applyQuaternion(worldQuaternion);
+
+    // Normalize and zero out Y component (keep movement horizontal)
+    forward.y = 0;
+    forward.normalize();
+
+    // If forward is zero (car pointing straight up/down), default to +Z
+    if (forward.lengthSq() < 0.01) {
+      forward.set(0, 0, 1);
     }
-
-    // 50% chance to flip direction (cars could be facing either way)
-    // Actually, let's be consistent - always use positive direction
-    // The turning around logic will handle bidirectional movement
 
     return forward;
   }

@@ -18,8 +18,8 @@ export const MUSIC_CONFIG = {
   /** Fade duration in seconds for music transitions */
   fadeDuration: 2.0,
 
-  /** Base volume for all music (0-1) - kept low so NPC voices are prominent */
-  masterVolume: 0.15,
+  /** Base volume for all music (0-1) - kept very low so NPC voices are prominent */
+  masterVolume: 0.03,
 
   /** Music tracks - calm layer always plays, intense layer fades in during chase */
   tracks: {
@@ -61,8 +61,8 @@ export const FOOTSTEP_CONFIG = {
   /** Time between footstep sounds while sprinting (seconds) */
   sprintInterval: 0.3,
 
-  /** Volume for footstep sounds */
-  volume: 0.4,
+  /** Volume for footstep sounds - kept very low so NPC voices are prominent */
+  volume: 0.05,
 
   /** Volume multiplier when sprinting */
   sprintVolumeMultiplier: 1.3,
@@ -89,7 +89,7 @@ export interface AmbientSound {
 
 export const AMBIENT_CONFIG = {
   /** Master volume for ambient sounds - kept very low as background texture */
-  masterVolume: 0.08,
+  masterVolume: 0.04,
 
   /** Ambient sound layers */
   sounds: {

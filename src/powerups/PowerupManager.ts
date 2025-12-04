@@ -51,20 +51,14 @@ export interface ActivePowerup {
 }
 
 /**
- * Spawn location for powerups
+ * Waypoint state - each waypoint has its own state
  */
-interface SpawnLocation {
+interface WaypointState {
   position: THREE.Vector3;
   groundCircle: THREE.Group;
-}
-
-/**
- * Powerup pickup in the world
- */
-interface PowerupPickup {
-  mesh: THREE.Group;
-  spawnIndex: number;
-  timeRemaining: number;
+  pickup: THREE.Group | null;        // Current pickup mesh (null if on cooldown)
+  cooldownRemaining: number;          // Cooldown timer (0 = powerup is present)
+  isOnCooldown: boolean;              // True if pickup was taken and waiting to respawn
 }
 
 /**
@@ -90,8 +84,7 @@ interface PowerupCallbacks {
  */
 interface PowerupConfig {
   effectDuration: number;       // How long effect lasts (seconds)
-  spawnDuration: number;        // How long pickup stays before moving (seconds)
-  respawnDelay: number;         // Delay after collection before new spawn (seconds)
+  waypointCooldown: number;     // Per-waypoint cooldown after collection (seconds)
   pickupRadius: number;         // Distance to collect powerup
   floatHeight: number;          // Height above ground
   rotationSpeed: number;        // Rotation speed (radians/sec)
@@ -99,8 +92,7 @@ interface PowerupConfig {
 
 const DEFAULT_CONFIG: PowerupConfig = {
   effectDuration: 5,   // Shorter boost duration for faster gameplay
-  spawnDuration: 8,    // Shorter spawn time
-  respawnDelay: 3,     // Faster respawn
+  waypointCooldown: 10, // 10 second cooldown per waypoint
   pickupRadius: 2.5,   // Slightly larger pickup radius
   floatHeight: 1.5,
   rotationSpeed: 3,    // Faster rotation
@@ -110,21 +102,19 @@ const DEFAULT_CONFIG: PowerupConfig = {
  * PowerupManager - Manages "Kávová loterie" powerup system
  *
  * Features:
- * - 3 spawn locations (center + 2 edges)
+ * - 9 waypoints (4 corners, 1 center, 4 between)
+ * - All waypoints always have powerups (unless on cooldown)
+ * - Per-waypoint 10 second cooldown after collection
  * - Rotating coffee cup pickup
  * - Random effect on collection (70% advantage, 30% disadvantage)
- * - 10 second effect duration
  */
 export class PowerupManager {
   private readonly scene: THREE.Scene;
   private readonly config: PowerupConfig;
-  private readonly spawnLocations: SpawnLocation[] = [];
+  private readonly waypoints: WaypointState[] = [];
   private readonly callbacks: PowerupCallbacks = {};
 
-  private activePickup: PowerupPickup | null = null;
   private activePowerup: ActivePowerup | null = null;
-  private respawnTimer = 0;
-  private isRespawning = false;
 
   // Test mode - all 7 powerups spawned at once
   private isTestMode = false;
@@ -178,9 +168,10 @@ export class PowerupManager {
   }
 
   /**
-   * Initialize spawn locations based on city bounds
+   * Initialize 9 waypoints based on city bounds
+   * Layout: 4 corners, 1 center (offset from player), 4 between (mid-edges)
    * @param cityBounds - City boundaries
-   * @param centerOffset - Optional offset from center to avoid props [x, z]
+   * @param centerOffset - Optional offset from center to avoid player spawn [x, z]
    */
   public initialize(
     cityBounds: { min: THREE.Vector2; max: THREE.Vector2 },
@@ -191,42 +182,56 @@ export class PowerupManager {
     const width = cityBounds.max.x - cityBounds.min.x;
     const depth = cityBounds.max.y - cityBounds.min.y;
 
-    // Apply offset to avoid center props (cactus, fountain, etc.)
-    const offsetX = centerOffset?.[0] ?? 0;
-    const offsetZ = centerOffset?.[1] ?? 0;
+    // Margin from edges (so corners aren't right at the wall)
+    const marginFactor = 0.35;
 
-    // 9 spawn locations spread across the map for more powerup action
+    // Apply offset for center to avoid player spawn
+    const offsetX = centerOffset?.[0] ?? 15;  // Default offset if not provided
+    const offsetZ = centerOffset?.[1] ?? -15;
+
+    // 9 waypoints:
+    // - 4 corners
+    // - 1 center (offset from player spawn)
+    // - 4 mid-edges (between corners and center)
     const positions = [
-      // Center area (offset to avoid props)
+      // 4 CORNERS
+      new THREE.Vector3(centerX - width * marginFactor, 0, centerZ - depth * marginFactor), // NW
+      new THREE.Vector3(centerX + width * marginFactor, 0, centerZ - depth * marginFactor), // NE
+      new THREE.Vector3(centerX - width * marginFactor, 0, centerZ + depth * marginFactor), // SW
+      new THREE.Vector3(centerX + width * marginFactor, 0, centerZ + depth * marginFactor), // SE
+
+      // 1 CENTER (offset to avoid player spawn)
       new THREE.Vector3(centerX + offsetX, 0, centerZ + offsetZ),
-      // Inner ring - 4 positions
-      new THREE.Vector3(centerX + width * 0.15, 0, centerZ),
-      new THREE.Vector3(centerX - width * 0.15, 0, centerZ),
-      new THREE.Vector3(centerX, 0, centerZ + depth * 0.15),
-      new THREE.Vector3(centerX, 0, centerZ - depth * 0.15),
-      // Outer ring - 4 positions
-      new THREE.Vector3(centerX + width * 0.3, 0, centerZ + depth * 0.3),
-      new THREE.Vector3(centerX - width * 0.3, 0, centerZ + depth * 0.3),
-      new THREE.Vector3(centerX + width * 0.3, 0, centerZ - depth * 0.3),
-      new THREE.Vector3(centerX - width * 0.3, 0, centerZ - depth * 0.3),
+
+      // 4 MID-EDGES (between corners and center)
+      new THREE.Vector3(centerX, 0, centerZ - depth * 0.25),          // North
+      new THREE.Vector3(centerX, 0, centerZ + depth * 0.25),          // South
+      new THREE.Vector3(centerX - width * 0.25, 0, centerZ),          // West
+      new THREE.Vector3(centerX + width * 0.25, 0, centerZ),          // East
     ];
 
-    console.log(`[PowerupManager] Center offset applied: [${offsetX}, ${offsetZ}]`);
+    console.log(`[PowerupManager] Initializing 9 waypoints (center offset: [${offsetX}, ${offsetZ}])`);
 
     for (const pos of positions) {
       const groundCircle = this.createGroundCircle(pos);
       this.scene.add(groundCircle);
 
-      this.spawnLocations.push({
+      // Create pickup immediately (all waypoints start with powerups)
+      const pickup = this.createCoffeeCup();
+      pickup.position.copy(pos);
+      pickup.position.y = this.config.floatHeight;
+      this.scene.add(pickup);
+
+      this.waypoints.push({
         position: pos.clone(),
         groundCircle,
+        pickup,
+        cooldownRemaining: 0,
+        isOnCooldown: false,
       });
     }
 
-    console.log('[PowerupManager] Initialized with 9 spawn locations');
-
-    // Spawn first powerup
-    this.spawnPowerup();
+    console.log(`[PowerupManager] Initialized ${this.waypoints.length} waypoints - all with powerups ready`);
   }
 
   /**
@@ -237,13 +242,16 @@ export class PowerupManager {
   public initializeTestMode(_playerSpawn: THREE.Vector3): void {
     this.isTestMode = true;
 
-    // Clear normal mode pickups
-    this.removePickup();
-    for (const loc of this.spawnLocations) {
-      this.scene.remove(loc.groundCircle);
-      this.disposeHexagon(loc.groundCircle);
+    // Clear normal mode waypoints
+    for (const wp of this.waypoints) {
+      this.scene.remove(wp.groundCircle);
+      this.disposeHexagon(wp.groundCircle);
+      if (wp.pickup) {
+        this.scene.remove(wp.pickup);
+        this.disposeCoffeeCup(wp.pickup);
+      }
     }
-    this.spawnLocations.length = 0;
+    this.waypoints.length = 0;
 
     // Spawn all 7 powerups in a semicircle at map center (100, 100)
     // This is the main intersection/square area
@@ -293,28 +301,40 @@ export class PowerupManager {
   }
 
   /**
-   * Set spawn positions manually
+   * Set waypoint positions manually
    */
   public setSpawnPositions(positions: THREE.Vector3[]): void {
-    // Clear existing
-    for (const loc of this.spawnLocations) {
-      this.scene.remove(loc.groundCircle);
-      this.disposeHexagon(loc.groundCircle);
+    // Clear existing waypoints
+    for (const wp of this.waypoints) {
+      this.scene.remove(wp.groundCircle);
+      this.disposeHexagon(wp.groundCircle);
+      if (wp.pickup) {
+        this.scene.remove(wp.pickup);
+        this.disposeCoffeeCup(wp.pickup);
+      }
     }
-    this.spawnLocations.length = 0;
+    this.waypoints.length = 0;
 
-    // Create new
+    // Create new waypoints with powerups
     for (const pos of positions) {
       const groundCircle = this.createGroundCircle(pos);
       this.scene.add(groundCircle);
 
-      this.spawnLocations.push({
+      const pickup = this.createCoffeeCup();
+      pickup.position.copy(pos);
+      pickup.position.y = this.config.floatHeight;
+      this.scene.add(pickup);
+
+      this.waypoints.push({
         position: pos.clone(),
         groundCircle,
+        pickup,
+        cooldownRemaining: 0,
+        isOnCooldown: false,
       });
     }
 
-    console.log(`[PowerupManager] Set ${positions.length} spawn positions`);
+    console.log(`[PowerupManager] Set ${positions.length} waypoint positions`);
   }
 
   /**
@@ -481,55 +501,41 @@ export class PowerupManager {
   }
 
   /**
-   * Spawn a powerup at random location
+   * Spawn a powerup at a specific waypoint
    */
-  private spawnPowerup(): void {
-    if (this.spawnLocations.length === 0) return;
+  private spawnAtWaypoint(waypoint: WaypointState): void {
+    if (waypoint.pickup) return; // Already has a pickup
 
-    // Pick random spawn location (different from current if possible)
-    let spawnIndex: number;
-    if (this.activePickup && this.spawnLocations.length > 1) {
-      // Pick different location
-      do {
-        spawnIndex = Math.floor(Math.random() * this.spawnLocations.length);
-      } while (spawnIndex === this.activePickup.spawnIndex);
-    } else {
-      spawnIndex = Math.floor(Math.random() * this.spawnLocations.length);
-    }
+    const pickup = this.createCoffeeCup();
+    pickup.position.copy(waypoint.position);
+    pickup.position.y = this.config.floatHeight;
+    this.scene.add(pickup);
 
-    const location = this.spawnLocations[spawnIndex];
-    if (!location) return;
+    waypoint.pickup = pickup;
+    waypoint.isOnCooldown = false;
+    waypoint.cooldownRemaining = 0;
+    waypoint.groundCircle.userData.isActive = true;
 
-    // Create coffee cup mesh
-    const mesh = this.createCoffeeCup();
-    mesh.position.copy(location.position);
-    mesh.position.y = this.config.floatHeight;
-    this.scene.add(mesh);
-
-    // Highlight hexagon platform (mark as active)
-    location.groundCircle.userData.isActive = true;
-
-    this.activePickup = {
-      mesh,
-      spawnIndex,
-      timeRemaining: this.config.spawnDuration,
-    };
-
-    this.isRespawning = false;
-
-    console.log(`[PowerupManager] Spawned powerup at location ${spawnIndex}`);
-    this.callbacks.onSpawn?.(location.position);
+    this.callbacks.onSpawn?.(waypoint.position);
   }
 
   /**
-   * Remove current pickup
+   * Remove pickup from a specific waypoint (on collection)
    */
-  private removePickup(): void {
-    if (!this.activePickup) return;
+  private removePickupFromWaypoint(waypoint: WaypointState): void {
+    if (!waypoint.pickup) return;
 
-    // Remove mesh
-    this.scene.remove(this.activePickup.mesh);
-    this.activePickup.mesh.traverse((child) => {
+    this.scene.remove(waypoint.pickup);
+    this.disposeCoffeeCup(waypoint.pickup);
+    waypoint.pickup = null;
+    waypoint.groundCircle.userData.isActive = false;
+  }
+
+  /**
+   * Dispose a coffee cup mesh and its materials
+   */
+  private disposeCoffeeCup(cup: THREE.Group): void {
+    cup.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose();
         if (child.material instanceof THREE.Material) {
@@ -537,14 +543,6 @@ export class PowerupManager {
         }
       }
     });
-
-    // Reset hexagon platform to inactive state
-    const location = this.spawnLocations[this.activePickup.spawnIndex];
-    if (location) {
-      location.groundCircle.userData.isActive = false;
-    }
-
-    this.activePickup = null;
   }
 
   /**
@@ -566,10 +564,13 @@ export class PowerupManager {
   }
 
   /**
-   * Collect powerup at player position
+   * Collect powerup from a waypoint
    */
-  private collectPowerup(definition: PowerupDefinition): void {
-    this.removePickup();
+  private collectPowerupFromWaypoint(waypoint: WaypointState, definition: PowerupDefinition): void {
+    // Remove pickup and start cooldown for this waypoint
+    this.removePickupFromWaypoint(waypoint);
+    waypoint.isOnCooldown = true;
+    waypoint.cooldownRemaining = this.config.waypointCooldown;
 
     // If there's an existing active powerup, expire it first
     if (this.activePowerup) {
@@ -588,10 +589,6 @@ export class PowerupManager {
 
     console.log(`[PowerupManager] Collected: ${definition.nameCz} (${definition.isAdvantage ? 'advantage' : 'disadvantage'})`);
     this.callbacks.onCollect?.(this.activePowerup);
-
-    // Start respawn timer
-    this.respawnTimer = this.config.respawnDelay;
-    this.isRespawning = true;
   }
 
   /**
@@ -613,29 +610,26 @@ export class PowerupManager {
         pickup.mesh.position.y = this.config.floatHeight + Math.sin(performance.now() * 0.003) * 0.1;
 
         // Animate steam
-        const steamGroup = pickup.mesh.userData.steamGroup as THREE.Group | undefined;
-        if (steamGroup) {
-          steamGroup.children.forEach((steam, i) => {
-            steam.position.y += deltaTime * 0.3;
-            if (steam.position.y > 1.2) {
-              steam.position.y = 0.6 + i * 0.15;
-            }
-            if (steam instanceof THREE.Mesh && steam.material instanceof THREE.MeshBasicMaterial) {
-              steam.material.opacity = Math.max(0, 0.5 - (steam.position.y - 0.6) * 0.5);
-            }
-          });
-        }
+        this.animateSteam(pickup.mesh, deltaTime);
 
         // Pulse glow
-        const glow = pickup.mesh.userData.glow as THREE.Mesh | undefined;
-        if (glow && glow.material instanceof THREE.MeshBasicMaterial) {
-          glow.material.opacity = 0.2 + Math.sin(performance.now() * 0.005) * 0.1;
-        }
+        this.animateGlow(pickup.mesh);
 
         // Check player distance - collect specific powerup type
         const distance = playerPosition.distanceTo(pickup.position);
         if (distance < this.config.pickupRadius) {
-          this.collectPowerup(pickup.definition);
+          // In test mode, use the old collectPowerup logic (direct collection)
+          if (this.activePowerup) {
+            this.callbacks.onExpire?.(this.activePowerup);
+            this.activePowerup = null;
+          }
+          this.activePowerup = {
+            type: pickup.definition.type,
+            definition: pickup.definition,
+            remainingTime: this.config.effectDuration,
+            totalTime: this.config.effectDuration,
+          };
+          this.callbacks.onCollect?.(this.activePowerup);
         }
       }
 
@@ -650,63 +644,36 @@ export class PowerupManager {
       return;
     }
 
-    // NORMAL MODE: Update active pickup
-    if (this.activePickup) {
-      // Rotate coffee cup
-      this.activePickup.mesh.rotation.y += this.config.rotationSpeed * deltaTime;
-
-      // Animate steam
-      const steamGroup = this.activePickup.mesh.userData.steamGroup as THREE.Group | undefined;
-      if (steamGroup) {
-        steamGroup.children.forEach((steam, i) => {
-          steam.position.y += deltaTime * 0.3;
-          if (steam.position.y > 1.2) {
-            steam.position.y = 0.6 + i * 0.15;
-          }
-          // Fade based on height
-          if (steam instanceof THREE.Mesh && steam.material instanceof THREE.MeshBasicMaterial) {
-            steam.material.opacity = Math.max(0, 0.5 - (steam.position.y - 0.6) * 0.5);
-          }
-        });
-      }
-
-      // Pulse glow
-      const glow = this.activePickup.mesh.userData.glow as THREE.Mesh | undefined;
-      if (glow) {
-        const pulse = 0.2 + Math.sin(performance.now() * 0.005) * 0.1;
-        if (glow.material instanceof THREE.MeshBasicMaterial) {
-          glow.material.opacity = pulse;
+    // NORMAL MODE: Update all waypoints
+    for (const waypoint of this.waypoints) {
+      // Handle waypoint cooldowns
+      if (waypoint.isOnCooldown) {
+        waypoint.cooldownRemaining -= deltaTime;
+        if (waypoint.cooldownRemaining <= 0) {
+          // Cooldown done, respawn the powerup
+          this.spawnAtWaypoint(waypoint);
         }
       }
 
-      // Bob up and down
-      this.activePickup.mesh.position.y = this.config.floatHeight + Math.sin(performance.now() * 0.003) * 0.1;
+      // Animate active pickups
+      if (waypoint.pickup) {
+        // Rotate coffee cup
+        waypoint.pickup.rotation.y += this.config.rotationSpeed * deltaTime;
 
-      // Check player distance
-      const location = this.spawnLocations[this.activePickup.spawnIndex];
-      if (location) {
-        const distance = playerPosition.distanceTo(location.position);
+        // Animate steam and glow
+        this.animateSteam(waypoint.pickup, deltaTime);
+        this.animateGlow(waypoint.pickup);
+
+        // Bob up and down
+        waypoint.pickup.position.y = this.config.floatHeight + Math.sin(performance.now() * 0.003) * 0.1;
+
+        // Check player distance for collection
+        const distance = playerPosition.distanceTo(waypoint.position);
         if (distance < this.config.pickupRadius) {
           // Collect!
           const powerup = this.selectRandomPowerup();
-          this.collectPowerup(powerup);
+          this.collectPowerupFromWaypoint(waypoint, powerup);
         }
-      }
-
-      // Update spawn timer
-      this.activePickup.timeRemaining -= deltaTime;
-      if (this.activePickup.timeRemaining <= 0) {
-        // Move to new location
-        this.removePickup();
-        this.spawnPowerup();
-      }
-    }
-
-    // Update respawn timer
-    if (this.isRespawning) {
-      this.respawnTimer -= deltaTime;
-      if (this.respawnTimer <= 0) {
-        this.spawnPowerup();
       }
     }
 
@@ -720,29 +687,55 @@ export class PowerupManager {
       }
     }
 
-    // Animate all hexagon platforms
+    // Animate all hexagon platforms (steady glow, no blinking)
     this.animateHexagons();
   }
 
   /**
-   * Animate hexagon platforms (rotation, pulse effect)
+   * Animate steam particles on a coffee cup
+   */
+  private animateSteam(mesh: THREE.Group, deltaTime: number): void {
+    const steamGroup = mesh.userData.steamGroup as THREE.Group | undefined;
+    if (steamGroup) {
+      steamGroup.children.forEach((steam, i) => {
+        steam.position.y += deltaTime * 0.3;
+        if (steam.position.y > 1.2) {
+          steam.position.y = 0.6 + i * 0.15;
+        }
+        if (steam instanceof THREE.Mesh && steam.material instanceof THREE.MeshBasicMaterial) {
+          steam.material.opacity = Math.max(0, 0.5 - (steam.position.y - 0.6) * 0.5);
+        }
+      });
+    }
+  }
+
+  /**
+   * Animate glow effect on a coffee cup (steady, no pulsing)
+   */
+  private animateGlow(mesh: THREE.Group): void {
+    const glow = mesh.userData.glow as THREE.Mesh | undefined;
+    if (glow && glow.material instanceof THREE.MeshBasicMaterial) {
+      // Steady glow - no pulsing/blinking
+      glow.material.opacity = 0.25;
+    }
+  }
+
+  /**
+   * Animate hexagon platforms (rotation, steady glow - NO blinking)
    */
   private animateHexagons(): void {
-    const time = performance.now() * 0.001; // seconds
-
-    for (const loc of this.spawnLocations) {
-      const hex = loc.groundCircle;
-      const isActive = hex.userData.isActive as boolean;
+    for (const waypoint of this.waypoints) {
+      const hex = waypoint.groundCircle;
+      const hasPickup = waypoint.pickup !== null;
+      const isOnCooldown = waypoint.isOnCooldown;
 
       // Slow rotation
       hex.rotation.z += 0.002;
 
-      // Pulse effect for active platforms
-      const baseBrightness = isActive ? 1.0 : 0.4;
-      const pulse = isActive ? Math.sin(time * 3) * 0.3 : 0;
-      const brightness = baseBrightness + pulse;
+      // Steady brightness - brighter when has pickup, dim during cooldown
+      const brightness = hasPickup ? 1.0 : (isOnCooldown ? 0.3 : 0.5);
 
-      // Update material opacities
+      // Update material opacities (steady, no pulsing)
       hex.traverse((child) => {
         if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
           const mat = child.material;
@@ -753,12 +746,12 @@ export class PowerupManager {
             }
           }
           if (mat instanceof THREE.LineBasicMaterial) {
-            // Outer ring pulsing
+            // Outer ring - steady glow
             if (child === hex.userData.outerRing) {
-              mat.opacity = (0.7 + pulse * 0.3) * (isActive ? 1 : 0.5);
+              mat.opacity = 0.7 * brightness;
             }
             if (child === hex.userData.outerRing2) {
-              mat.opacity = (0.3 + pulse * 0.2) * (isActive ? 1 : 0.3);
+              mat.opacity = 0.4 * brightness;
             }
           }
         }
@@ -789,19 +782,28 @@ export class PowerupManager {
   }
 
   /**
-   * Get spawn location positions (for minimap)
+   * Get all waypoint positions (for minimap)
    */
   public getSpawnPositions(): THREE.Vector3[] {
-    return this.spawnLocations.map(loc => loc.position.clone());
+    return this.waypoints.map(wp => wp.position.clone());
   }
 
   /**
-   * Get active pickup position (for minimap)
+   * Get positions of all active pickups (for minimap)
+   */
+  public getActivePickupPositions(): THREE.Vector3[] {
+    return this.waypoints
+      .filter(wp => wp.pickup !== null)
+      .map(wp => wp.position.clone());
+  }
+
+  /**
+   * Get active pickup position (for minimap compatibility) - returns first active or null
+   * @deprecated Use getActivePickupPositions() instead
    */
   public getActivePickupPosition(): THREE.Vector3 | null {
-    if (!this.activePickup) return null;
-    const location = this.spawnLocations[this.activePickup.spawnIndex];
-    return location ? location.position.clone() : null;
+    const activeWaypoint = this.waypoints.find(wp => wp.pickup !== null);
+    return activeWaypoint ? activeWaypoint.position.clone() : null;
   }
 
   /**
@@ -822,14 +824,24 @@ export class PowerupManager {
    * Clean up resources
    */
   public dispose(): void {
-    this.removePickup();
-
-    for (const loc of this.spawnLocations) {
-      this.scene.remove(loc.groundCircle);
-      this.disposeHexagon(loc.groundCircle);
+    // Clean up all waypoints
+    for (const wp of this.waypoints) {
+      this.scene.remove(wp.groundCircle);
+      this.disposeHexagon(wp.groundCircle);
+      if (wp.pickup) {
+        this.scene.remove(wp.pickup);
+        this.disposeCoffeeCup(wp.pickup);
+      }
     }
 
-    this.spawnLocations.length = 0;
+    // Clean up test mode pickups
+    for (const pickup of this.testPickups) {
+      this.scene.remove(pickup.mesh);
+      this.disposeCoffeeCup(pickup.mesh);
+    }
+
+    this.waypoints.length = 0;
+    this.testPickups.length = 0;
     this.cupMaterial.dispose();
     this.steamMaterial.dispose();
     this.hexagonMaterial.dispose();

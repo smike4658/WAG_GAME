@@ -96,34 +96,55 @@ export class EmployeeManager {
 
   /**
    * Find a valid spawn position that is within bounds and not inside a building
+   * Now distributes across the ENTIRE map, not just a ring around center
    */
   private findValidSpawnPosition(
-    spawnCenter: THREE.Vector3,
-    spawnRadius: number,
-    baseAngle: number,
-    maxAttempts: number = 10
+    _spawnCenter: THREE.Vector3,
+    _spawnRadius: number,
+    employeeIndex: number,
+    totalEmployees: number,
+    maxAttempts: number = 15
   ): THREE.Vector3 {
     const collider = getCityCollider();
     const bounds = collider.getBounds();
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      // Add some randomness to angle on retry
-      const angle = baseAngle + (attempt * 0.3);
-      const distance = spawnRadius * (0.5 + Math.random() * 0.5);
+    // Calculate map dimensions with margin
+    const margin = 15; // Keep away from edges
+    const minX = bounds.min.x + margin;
+    const maxX = bounds.max.x - margin;
+    const minZ = bounds.min.z + margin;
+    const maxZ = bounds.max.z - margin;
+    const mapWidth = maxX - minX;
+    const mapDepth = maxZ - minZ;
 
+    // Use a grid-based distribution with jitter for natural spread
+    // Calculate grid dimensions based on employee count
+    const gridCols = Math.ceil(Math.sqrt(totalEmployees * (mapWidth / mapDepth)));
+    const gridRows = Math.ceil(totalEmployees / gridCols);
+
+    // Calculate cell size
+    const cellWidth = mapWidth / gridCols;
+    const cellDepth = mapDepth / gridRows;
+
+    // Determine grid position for this employee
+    const col = employeeIndex % gridCols;
+    const row = Math.floor(employeeIndex / gridCols);
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      // Add random jitter within the cell (40-60% of cell size for variation)
+      const jitterX = (Math.random() - 0.5) * cellWidth * 0.8;
+      const jitterZ = (Math.random() - 0.5) * cellDepth * 0.8;
+
+      // Calculate position with grid + jitter
       const position = new THREE.Vector3(
-        spawnCenter.x + Math.cos(angle) * distance,
+        minX + (col + 0.5) * cellWidth + jitterX,
         0,
-        spawnCenter.z + Math.sin(angle) * distance
+        minZ + (row + 0.5) * cellDepth + jitterZ
       );
 
-      // Check if within map bounds
-      if (!bounds.containsPoint(position)) {
-        // Clamp to bounds with margin
-        const margin = 5;
-        position.x = Math.max(bounds.min.x + margin, Math.min(position.x, bounds.max.x - margin));
-        position.z = Math.max(bounds.min.z + margin, Math.min(position.z, bounds.max.z - margin));
-      }
+      // Clamp to bounds
+      position.x = Math.max(minX, Math.min(position.x, maxX));
+      position.z = Math.max(minZ, Math.min(position.z, maxZ));
 
       // Check collision with buildings (check at waist height ~1m)
       const checkPos = position.clone();
@@ -132,19 +153,19 @@ export class EmployeeManager {
 
       if (!collision) {
         // Valid position found
+        console.log(`[EmployeeManager] Spawned employee ${employeeIndex} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
         return position;
       }
 
-      // Try again with different angle/distance
-      console.log(`[EmployeeManager] Spawn attempt ${attempt + 1} blocked by ${collision.type}, retrying...`);
+      // Try again with different jitter
     }
 
-    // Fallback: return clamped position even if in collision
-    console.warn('[EmployeeManager] Could not find collision-free spawn, using fallback');
+    // Fallback: random position in grid cell
+    console.warn(`[EmployeeManager] Could not find collision-free spawn for employee ${employeeIndex}, using fallback`);
     const fallback = new THREE.Vector3(
-      Math.max(bounds.min.x + 10, Math.min(spawnCenter.x, bounds.max.x - 10)),
+      minX + (col + 0.5) * cellWidth,
       0,
-      Math.max(bounds.min.z + 10, Math.min(spawnCenter.z, bounds.max.z - 10))
+      minZ + (row + 0.5) * cellDepth
     );
     return fallback;
   }
@@ -160,15 +181,17 @@ export class EmployeeManager {
     this.totalCount = employeeDataList.length;
     this.caughtCount = 0;
 
+    const totalEmployees = employeeDataList.length;
+    console.log(`[EmployeeManager] Spawning ${totalEmployees} employees across the map...`);
+
     for (let i = 0; i < employeeDataList.length; i++) {
       const data = employeeDataList[i];
       if (!data) continue;
 
       const id = `employee_${i}_${data.name.replace(/\s+/g, '_')}`;
 
-      // Calculate spawn position in a ring around center with validation
-      const baseAngle = (i / employeeDataList.length) * Math.PI * 2;
-      const position = this.findValidSpawnPosition(spawnCenter, spawnRadius, baseAngle);
+      // Calculate spawn position distributed across the entire map (grid with jitter)
+      const position = this.findValidSpawnPosition(spawnCenter, spawnRadius, i, totalEmployees);
 
       // Determine gender - use specified or random for the role
       const gender: Gender = data.gender ?? this.characterLoader.getRandomGenderForRole(data.roleId);

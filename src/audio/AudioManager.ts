@@ -132,6 +132,10 @@ export class AudioManager {
   private lastNpcVoiceTime = 0;
   private readonly npcVoiceCooldown = 2000; // 2 seconds between NPC voices
 
+  // Player voice cooldown - prevents player from talking too much
+  private lastPlayerVoiceTime = 0;
+  private readonly playerVoiceCooldown = 5000; // 5 seconds between player voices
+
   private constructor() {
     // Organize clips by role
     for (const clip of VOICE_CLIPS) {
@@ -312,7 +316,8 @@ export class AudioManager {
       }
 
       this.lastNpcVoiceTime = now;
-      this.playSoundAtPosition(clip.id, position, 2.0);
+      // Play NPC voice at their position
+      this.playNpcVoiceSound(clip.id, position);
       return;
     }
 
@@ -335,9 +340,28 @@ export class AudioManager {
       return;
     }
 
-    // NPC voices use 2x volume multiplier for better audibility
+    // Play NPC voice at their position
     this.lastNpcVoiceTime = now;
-    this.playSoundAtPosition(clip.id, position, 2.0);
+    this.playNpcVoiceSound(clip.id, position);
+  }
+
+  /**
+   * Play NPC voice at position with high volume
+   */
+  private playNpcVoiceSound(soundId: string, position: THREE.Vector3): void {
+    const sound = this.sounds.get(soundId);
+    if (sound) {
+      // Calculate distance-based volume with high multiplier
+      const distance = this.listenerPosition.distanceTo(position);
+      const maxDistance = 60; // Larger hearing range for NPC voices
+      const baseVolume = Math.max(0.3, 1 - distance / maxDistance); // Minimum 30% volume
+      const volume = baseVolume * 3.0; // 3x multiplier for loudness
+
+      const id = sound.play();
+      sound.volume(volume, id);
+      sound.pos(position.x, position.y, position.z, id);
+      console.log(`[AudioManager] Playing NPC voice: ${soundId} at distance ${distance.toFixed(1)}, volume ${volume.toFixed(2)}`);
+    }
   }
 
   /**
@@ -374,7 +398,8 @@ export class AudioManager {
     const distance = this.listenerPosition.distanceTo(position);
     const maxDistance = 50;
     const baseVolume = Math.max(0, 1 - distance / maxDistance);
-    const volume = Math.min(1, baseVolume * volumeMultiplier); // Apply multiplier, clamp to max 1
+    // Allow volume above 1.0 for louder NPC voices (Howler.js supports gain boost)
+    const volume = baseVolume * volumeMultiplier;
 
     if (volume <= 0) return; // Too far to hear
 
@@ -412,14 +437,20 @@ export class AudioManager {
 
   /**
    * Play random exhaustion voice line (when sprint ends)
+   * Has cooldown to prevent spam
    */
   public playExhaustionSound(): void {
     if (!this.enabled) return;
 
+    // Check cooldown
+    const now = Date.now();
+    if (now - this.lastPlayerVoiceTime < this.playerVoiceCooldown) {
+      return; // Skip silently
+    }
+
     const exhaustClips = this.clipsByRole.get('player');
 
     if (!exhaustClips || exhaustClips.length === 0) {
-      console.log('[Player] "Už nemůžu!"');
       return;
     }
 
@@ -428,12 +459,11 @@ export class AudioManager {
 
     // Check if sound exists
     if (!this.sounds.has(clip.id)) {
-      console.log(`[Player] "${clip.text}"`);
       return;
     }
 
-    // Play as UI sound (non-spatial, always audible)
-    this.playUISound(clip.id);
+    this.lastPlayerVoiceTime = now;
+    this.playPlayerVoiceSound(clip.id);
   }
 
   /**
@@ -464,71 +494,100 @@ export class AudioManager {
 
   /**
    * Play random player idle voice line (when searching for employees)
+   * Has cooldown to prevent spam
    */
   public playPlayerIdleSound(): void {
     if (!this.enabled) return;
 
+    // Check cooldown
+    const now = Date.now();
+    if (now - this.lastPlayerVoiceTime < this.playerVoiceCooldown) {
+      return; // Skip silently
+    }
+
     const idleClips = this.clipsByRole.get('player_idle');
 
     if (!idleClips || idleClips.length === 0) {
-      console.log('[Player] "Tak kde jsou?"');
       return;
     }
 
     const clip = idleClips[Math.floor(Math.random() * idleClips.length)]!;
 
     if (!this.sounds.has(clip.id)) {
-      console.log(`[Player] "${clip.text}"`);
       return;
     }
 
-    this.playUISound(clip.id);
+    this.lastPlayerVoiceTime = now;
+    this.playPlayerVoiceSound(clip.id);
   }
 
   /**
    * Play random player approach voice line (when getting close to employee)
+   * Has cooldown to prevent spam
    */
   public playPlayerApproachSound(): void {
     if (!this.enabled) return;
 
+    // Check cooldown
+    const now = Date.now();
+    if (now - this.lastPlayerVoiceTime < this.playerVoiceCooldown) {
+      return; // Skip silently
+    }
+
     const approachClips = this.clipsByRole.get('player_approach');
 
     if (!approachClips || approachClips.length === 0) {
-      console.log('[Player] "Pěkně do práce!"');
       return;
     }
 
     const clip = approachClips[Math.floor(Math.random() * approachClips.length)]!;
 
     if (!this.sounds.has(clip.id)) {
-      console.log(`[Player] "${clip.text}"`);
       return;
     }
 
-    this.playUISound(clip.id);
+    this.lastPlayerVoiceTime = now;
+    this.playPlayerVoiceSound(clip.id);
   }
 
   /**
    * Play random player catch success voice line
+   * Has cooldown to prevent spam
    */
   public playPlayerCatchSound(): void {
     if (!this.enabled) return;
 
+    // Check cooldown
+    const now = Date.now();
+    if (now - this.lastPlayerVoiceTime < this.playerVoiceCooldown) {
+      return; // Skip silently
+    }
+
     const catchClips = this.clipsByRole.get('player_catch');
 
     if (!catchClips || catchClips.length === 0) {
-      console.log('[Player] "Výborně!"');
       return;
     }
 
     const clip = catchClips[Math.floor(Math.random() * catchClips.length)]!;
 
     if (!this.sounds.has(clip.id)) {
-      console.log(`[Player] "${clip.text}"`);
       return;
     }
 
-    this.playUISound(clip.id);
+    this.lastPlayerVoiceTime = now;
+    this.playPlayerVoiceSound(clip.id);
+  }
+
+  /**
+   * Play player voice at lower volume
+   */
+  private playPlayerVoiceSound(soundId: string): void {
+    const sound = this.sounds.get(soundId);
+    if (sound) {
+      const id = sound.play();
+      sound.volume(0.4, id); // Lower volume for player voices
+    }
   }
 
   /**
