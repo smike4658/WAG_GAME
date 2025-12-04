@@ -106,6 +106,10 @@ export class Employee {
   private panicTimer = 0;
   private hasScreamedThisEncounter = false;
 
+  // Periodic screaming while fleeing
+  private screamTimer = 0;
+  private readonly screamInterval = 3; // Scream every 3 seconds while fleeing
+
   // Obstacle avoidance
   private obstacleAvoidanceDirection: THREE.Vector3 | null = null;
   private obstacleAvoidanceTimer = 0;
@@ -913,6 +917,7 @@ export class Employee {
       if (distanceToPlayer > this.config.detectionRadius) {
         this.state = 'alert'; // Stay alert, don't go back to idle immediately
         this.hasScreamedThisEncounter = false; // Reset for next encounter
+        this.screamTimer = 0; // Reset periodic scream timer
       }
       return;
     }
@@ -933,6 +938,7 @@ export class Employee {
       }
       this.state = 'idle';
       this.hasScreamedThisEncounter = false; // Reset for next encounter
+      this.screamTimer = 0; // Reset periodic scream timer
     }
   }
 
@@ -1055,8 +1061,17 @@ export class Employee {
   /**
    * Fleeing behavior - smart escape that avoids walls and map edges
    */
-  private updateFleeing(_deltaTime: number, playerPosition: THREE.Vector3): void {
+  private updateFleeing(deltaTime: number, playerPosition: THREE.Vector3): void {
     const currentPos = this.mesh.position.clone();
+
+    // Periodic screaming while fleeing
+    this.screamTimer += deltaTime;
+    if (this.screamTimer >= this.screamInterval) {
+      this.screamTimer = 0;
+      if (this.onScream) {
+        this.onScream(this);
+      }
+    }
 
     // Get map bounds for edge awareness
     const bounds = this.collider?.getBounds();

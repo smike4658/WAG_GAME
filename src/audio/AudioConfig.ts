@@ -124,7 +124,7 @@ export const AMBIENT_CONFIG = {
  */
 export const AUDIO_SETTINGS = {
   /** Global master volume (affects everything) */
-  masterVolume: 0.7,
+  masterVolume: 0.8,
 
   /** Whether to auto-play music on game start */
   autoPlayMusic: true,

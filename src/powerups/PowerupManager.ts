@@ -185,14 +185,15 @@ export class PowerupManager {
     // Margin from edges (so corners aren't right at the wall)
     const marginFactor = 0.35;
 
-    // Apply offset for center to avoid player spawn
-    const offsetX = centerOffset?.[0] ?? 15;  // Default offset if not provided
-    const offsetZ = centerOffset?.[1] ?? -15;
+    // Player spawns near center - offset waypoints to avoid spawn area
+    // Use provided offset or default to significant distance from center
+    const spawnOffsetX = centerOffset?.[0] ?? 25;
+    const spawnOffsetZ = centerOffset?.[1] ?? 25;
 
-    // 9 waypoints:
+    // 9 waypoints arranged to avoid player spawn (which is near center):
     // - 4 corners
-    // - 1 center (offset from player spawn)
-    // - 4 mid-edges (between corners and center)
+    // - 1 center-ish (significantly offset from player spawn)
+    // - 4 mid-edges (offset slightly from exact center lines)
     const positions = [
       // 4 CORNERS
       new THREE.Vector3(centerX - width * marginFactor, 0, centerZ - depth * marginFactor), // NW
@@ -200,17 +201,17 @@ export class PowerupManager {
       new THREE.Vector3(centerX - width * marginFactor, 0, centerZ + depth * marginFactor), // SW
       new THREE.Vector3(centerX + width * marginFactor, 0, centerZ + depth * marginFactor), // SE
 
-      // 1 CENTER (offset to avoid player spawn)
-      new THREE.Vector3(centerX + offsetX, 0, centerZ + offsetZ),
+      // 1 CENTER-ISH (far from player spawn - opposite direction)
+      new THREE.Vector3(centerX - spawnOffsetX, 0, centerZ - spawnOffsetZ),
 
-      // 4 MID-EDGES (between corners and center)
-      new THREE.Vector3(centerX, 0, centerZ - depth * 0.25),          // North
-      new THREE.Vector3(centerX, 0, centerZ + depth * 0.25),          // South
-      new THREE.Vector3(centerX - width * 0.25, 0, centerZ),          // West
-      new THREE.Vector3(centerX + width * 0.25, 0, centerZ),          // East
+      // 4 MID-EDGES (offset from center lines to avoid player spawn area)
+      new THREE.Vector3(centerX + width * 0.15, 0, centerZ - depth * 0.22),  // NE-ish
+      new THREE.Vector3(centerX - width * 0.15, 0, centerZ + depth * 0.22),  // SW-ish
+      new THREE.Vector3(centerX - width * 0.22, 0, centerZ - depth * 0.15),  // NW-ish
+      new THREE.Vector3(centerX + width * 0.22, 0, centerZ + depth * 0.15),  // SE-ish
     ];
 
-    console.log(`[PowerupManager] Initializing 9 waypoints (center offset: [${offsetX}, ${offsetZ}])`);
+    console.log(`[PowerupManager] Initializing 9 waypoints (spawn offset: [${spawnOffsetX}, ${spawnOffsetZ}])`);
 
     for (const pos of positions) {
       const groundCircle = this.createGroundCircle(pos);

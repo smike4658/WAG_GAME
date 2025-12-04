@@ -130,7 +130,7 @@ export class AudioManager {
 
   // NPC voice cooldown - prevents multiple NPCs speaking at once
   private lastNpcVoiceTime = 0;
-  private readonly npcVoiceCooldown = 2000; // 2 seconds between NPC voices
+  private readonly npcVoiceCooldown = 800; // 0.8 seconds between NPC voices (more frequent talking)
 
   // Player voice cooldown - prevents player from talking too much
   private lastPlayerVoiceTime = 0;
@@ -353,9 +353,9 @@ export class AudioManager {
     if (sound) {
       // Calculate distance-based volume with high multiplier
       const distance = this.listenerPosition.distanceTo(position);
-      const maxDistance = 60; // Larger hearing range for NPC voices
-      const baseVolume = Math.max(0.3, 1 - distance / maxDistance); // Minimum 30% volume
-      const volume = baseVolume * 3.0; // 3x multiplier for loudness
+      const maxDistance = 80; // Very large hearing range for NPC voices
+      const baseVolume = Math.max(0.4, 1 - distance / maxDistance); // Minimum 40% volume
+      const volume = baseVolume * 5.0; // 5x multiplier for loudness (very prominent NPC voices)
 
       const id = sound.play();
       sound.volume(volume, id);
