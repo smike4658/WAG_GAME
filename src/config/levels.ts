@@ -9,6 +9,8 @@ export interface LevelConfig {
   description: string;
   thumbnail: string;
   type: 'simple' | 'static';
+  /** If true, level is shown but not selectable (coming soon) */
+  disabled?: boolean;
 
   // For SimpleCity
   simpleConfig?: {
@@ -44,6 +46,7 @@ export const LEVELS: LevelConfig[] = [
     description: 'A controlled environment to practice your net-throwing skills.',
     thumbnail: '/thumbnails/test-city.png',
     type: 'simple',
+    disabled: true,
     simpleConfig: {
       size: new THREE.Vector2(200, 200),
       roadWidth: 10,
@@ -75,6 +78,7 @@ export const LEVELS: LevelConfig[] = [
     description: 'The bustling heart of the city. High traffic, high rewards.',
     thumbnail: '/thumbnails/low-poly-city.png',
     type: 'static',
+    disabled: true,
     staticConfig: {
       modelPath: '/low-poly-city/Low Poly City.glb',
       scale: 1.0,

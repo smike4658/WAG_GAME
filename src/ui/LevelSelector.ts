@@ -193,14 +193,42 @@ export class LevelSelector {
 
   private createLevelCard(level: LevelConfig, index: number): HTMLDivElement {
     const card = document.createElement('div');
-    card.className = 'level-card';
+    card.className = level.disabled ? 'level-card level-card-disabled' : 'level-card';
     card.dataset.levelId = level.id;
 
     // Determine icon based on level type
     const icon = level.type === 'simple' ? '🔧' : '🏙️';
     const typeLabel = level.type === 'simple' ? 'TEST' : 'CITY';
 
+    // Coming soon overlay for disabled levels
+    const comingSoonOverlay = level.disabled ? `
+      <div style="
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+      ">
+        <span style="
+          background: rgba(100, 100, 100, 0.9);
+          color: #ccc;
+          padding: 8px 20px;
+          border-radius: 20px;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: 2px;
+          text-transform: uppercase;
+        ">Coming Soon</span>
+      </div>
+    ` : '';
+
     card.innerHTML = `
+      ${comingSoonOverlay}
       <div class="card-thumbnail" style="
         width: 100%;
         height: 140px;
@@ -214,11 +242,12 @@ export class LevelSelector {
         border-bottom: 1px solid rgba(255,255,255,0.1);
       ">
         <span style="
-          z-index: 1; 
-          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+          z-index: 1;
+          filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3)) ${level.disabled ? 'grayscale(1)' : ''};
           transition: transform 0.3s ease;
+          opacity: ${level.disabled ? '0.5' : '1'};
         " class="card-icon">${icon}</span>
-        
+
         <div style="
           position: absolute;
           top: 15px;
@@ -231,6 +260,7 @@ export class LevelSelector {
           font-weight: 700;
           letter-spacing: 1px;
           box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+          ${level.disabled ? 'filter: grayscale(1); opacity: 0.5;' : ''}
         ">${typeLabel}</div>
       </div>
       <div class="card-content" style="
@@ -239,13 +269,13 @@ export class LevelSelector {
       ">
         <h3 style="
           margin: 0 0 10px 0;
-          color: white;
+          color: ${level.disabled ? 'rgba(255, 255, 255, 0.4)' : 'white'};
           font-size: 20px;
           font-weight: 600;
         ">${level.name}</h3>
         <p style="
           margin: 0;
-          color: rgba(255, 255, 255, 0.6);
+          color: rgba(255, 255, 255, ${level.disabled ? '0.3' : '0.6'});
           font-size: 14px;
           line-height: 1.4;
         ">${level.description}</p>
@@ -259,12 +289,14 @@ export class LevelSelector {
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 16px;
-      cursor: pointer;
+      cursor: ${level.disabled ? 'not-allowed' : 'pointer'};
       transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
       border: 1px solid rgba(255, 255, 255, 0.15);
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
       overflow: hidden;
       animation: fadeInUp 0.5s ease ${index * 0.1}s both;
+      position: relative;
+      ${level.disabled ? 'opacity: 0.7;' : ''}
     `;
 
     // Add animation keyframes if not already added
@@ -282,34 +314,39 @@ export class LevelSelector {
             transform: translateY(0);
           }
         }
-        .level-card:hover {
+        .level-card:not(.level-card-disabled):hover {
           transform: translateY(-8px);
           background: rgba(30, 30, 50, 0.95) !important;
           border-color: #FFD700 !important;
           box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.3) !important;
         }
-        .level-card:hover .card-icon {
+        .level-card:not(.level-card-disabled):hover .card-icon {
           transform: scale(1.15) rotate(5deg);
         }
-        .level-card:active {
+        .level-card:not(.level-card-disabled):active {
           transform: translateY(-4px) scale(1.01);
+        }
+        .level-card-disabled:hover {
+          opacity: 0.75 !important;
         }
       `;
       document.head.appendChild(style);
     }
 
-    // Click handler
-    card.addEventListener('click', () => {
-      this.selectedLevel = level;
-      this.highlightCard(card);
+    // Click handler - only for enabled levels
+    if (!level.disabled) {
+      card.addEventListener('click', () => {
+        this.selectedLevel = level;
+        this.highlightCard(card);
 
-      // Small delay before callback for visual feedback
-      setTimeout(() => {
-        if (this.onSelect) {
-          this.onSelect(level);
-        }
-      }, 200);
-    });
+        // Small delay before callback for visual feedback
+        setTimeout(() => {
+          if (this.onSelect) {
+            this.onSelect(level);
+          }
+        }, 200);
+      });
+    }
 
     return card;
   }
