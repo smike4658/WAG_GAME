@@ -113,7 +113,7 @@ export class Employee {
 
   // Periodic screaming while fleeing
   private screamTimer = 0;
-  private readonly screamInterval = 3; // Scream every 3 seconds while fleeing
+  private readonly screamInterval = 1.5; // Scream every 1.5 seconds while fleeing
 
   // Obstacle avoidance
   private obstacleAvoidanceDirection: THREE.Vector3 | null = null;
@@ -200,15 +200,15 @@ export class Employee {
       this.createFallbackMesh();
     }
 
-    // Create alert indicator (floating exclamation)
-    const alertGeometry = new THREE.ConeGeometry(0.15, 0.4, 4);
+    // Create alert indicator (floating exclamation) - large and bright for visibility
+    const alertGeometry = new THREE.ConeGeometry(0.25, 0.6, 4);
     const alertMaterial = new THREE.MeshBasicMaterial({
       color: 0xFFFF00,
       transparent: true,
       opacity: 0,
     });
     this.alertIndicator = new THREE.Mesh(alertGeometry, alertMaterial);
-    this.alertIndicator.position.y = 2.2;
+    this.alertIndicator.position.y = 2.5;
     this.alertIndicator.rotation.z = Math.PI; // Point up
     this.mesh.add(this.alertIndicator);
 
@@ -725,6 +725,16 @@ export class Employee {
   /**
    * Update employee each frame
    */
+  // Nearby fleeing employees (set by EmployeeManager each frame)
+  private nearbyFleeingPositions: THREE.Vector3[] = [];
+
+  /**
+   * Set positions of nearby fleeing employees for avoidance during flee
+   */
+  public setNearbyFleeingPositions(positions: THREE.Vector3[]): void {
+    this.nearbyFleeingPositions = positions;
+  }
+
   public update(deltaTime: number, playerPosition: THREE.Vector3): void {
     if (this.state === 'caught') return;
 
@@ -1137,7 +1147,8 @@ export class Employee {
       playerPosition,
       awayFromPlayer,
       mapCenter,
-      bounds
+      bounds,
+      this.nearbyFleeingPositions
     );
 
     this.velocity.copy(bestDirection.multiplyScalar(this.config.runSpeed));
@@ -1151,7 +1162,8 @@ export class Employee {
     playerPos: THREE.Vector3,
     awayFromPlayer: THREE.Vector3,
     mapCenter: THREE.Vector3,
-    bounds: THREE.Box3 | undefined
+    bounds: THREE.Box3 | undefined,
+    nearbyFleeing: THREE.Vector3[] = []
   ): THREE.Vector3 {
     // Sample 8 directions: away from player + 7 variations
     const candidates: { direction: THREE.Vector3; score: number }[] = [];
@@ -1176,7 +1188,8 @@ export class Employee {
         direction,
         toCenter,
         bounds,
-        edgeProximity
+        edgeProximity,
+        nearbyFleeing
       );
 
       candidates.push({ direction, score });
@@ -1203,7 +1216,8 @@ export class Employee {
     direction: THREE.Vector3,
     toCenter: THREE.Vector3,
     bounds: THREE.Box3 | undefined,
-    edgeProximity: number
+    edgeProximity: number,
+    nearbyFleeing: THREE.Vector3[] = []
   ): number {
     let score = 0;
 
@@ -1242,6 +1256,26 @@ export class Employee {
       const actualDistance = adjusted.distanceTo(currentPos.clone().setY(1.0));
       if (actualDistance < lookAhead * 0.5) {
         score -= 60; // Penalty for obstacles
+      }
+    }
+
+    // 4. Avoid running toward other fleeing employees - spread out!
+    const avoidRadius = 8; // Start avoiding within 8m
+    for (const otherPos of nearbyFleeing) {
+      const toOther = otherPos.clone().sub(currentPos);
+      toOther.y = 0;
+      const dist = toOther.length();
+
+      if (dist < avoidRadius && dist > 0.1) {
+        // How much does this direction point toward the other employee?
+        toOther.normalize();
+        const towardOther = direction.dot(toOther);
+
+        if (towardOther > 0) {
+          // Penalty scales with proximity and how directly we'd run into them
+          const proximityFactor = 1 - dist / avoidRadius; // 0 at edge, 1 at contact
+          score -= towardOther * proximityFactor * 35;
+        }
       }
     }
 
@@ -1306,22 +1340,22 @@ export class Employee {
         material.color.setHex(0xFF8800);
         material.opacity = 1;
         const panicPulse = (Math.sin(Date.now() * 0.03) + 1) / 2; // Faster pulse
-        this.alertIndicator.scale.setScalar(1.2 + panicPulse * 0.6);
+        this.alertIndicator.scale.setScalar(1.5 + panicPulse * 0.8);
         break;
       }
       case 'fleeing': {
-        material.color.setHex(0xFF0000); // Red
+        material.color.setHex(0xFF0000); // Bright red
         material.opacity = 1;
-        // Pulsing effect
-        const fleePulse = (Math.sin(Date.now() * 0.01) + 1) / 2;
-        this.alertIndicator.scale.setScalar(0.8 + fleePulse * 0.4);
+        // Fast pulsing effect for urgency
+        const fleePulse = (Math.sin(Date.now() * 0.015) + 1) / 2;
+        this.alertIndicator.scale.setScalar(1.2 + fleePulse * 0.6);
         break;
       }
     }
 
-    // Bob up and down
+    // Bob up and down - more pronounced
     if (material.opacity > 0) {
-      this.alertIndicator.position.y = 2.2 + Math.sin(Date.now() * 0.005) * 0.1;
+      this.alertIndicator.position.y = 2.5 + Math.sin(Date.now() * 0.005) * 0.15;
     }
   }
 

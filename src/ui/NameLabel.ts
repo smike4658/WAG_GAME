@@ -24,12 +24,12 @@ export class NameLabel {
     const nameEl = document.createElement('div');
     nameEl.textContent = name;
     nameEl.style.cssText = `
-      font-size: 14px;
+      font-size: 15px;
       font-weight: bold;
       color: #ffffff;
       text-shadow:
-        0 1px 2px rgba(0,0,0,0.8),
-        0 0 4px rgba(0,0,0,0.5);
+        0 1px 3px rgba(0,0,0,0.9),
+        0 0 6px rgba(0,0,0,0.6);
       margin-bottom: 2px;
     `;
     this.element.appendChild(nameEl);
@@ -63,8 +63,8 @@ export class NameLabel {
    * Update label visibility based on distance to camera
    */
   public updateVisibility(distanceToCamera: number): void {
-    // Fade out when far away
-    const maxDistance = 50;
+    // Fade out when far away - visible from greater distance
+    const maxDistance = 70;
     const minDistance = 5;
 
     if (distanceToCamera > maxDistance) {

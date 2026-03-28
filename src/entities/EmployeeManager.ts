@@ -215,6 +215,7 @@ export class EmployeeManager {
       let characterModel: THREE.Group | undefined;
       let animations: THREE.AnimationClip[] | undefined;
       let scaleOverride: number | undefined;
+      let yOffset: number | undefined;
 
       // Debug: Check CharacterLoader state
       console.log(`[EmployeeManager] CharacterLoader initialized: ${this.characterLoader.isInitialized()}, loaded count: ${this.characterLoader.getLoadedCount()}`);
@@ -228,7 +229,8 @@ export class EmployeeManager {
         characterModel = charLoaderModel;
         animations = this.characterLoader.getCharacterAnimations(data.roleId, gender);
         scaleOverride = this.characterLoader.getScaleOverride(data.roleId, gender);
-        console.log(`[EmployeeManager] Using custom model for ${data.roleId} with ${animations?.length ?? 0} animations, scaleOverride: ${scaleOverride ?? 'auto'}`);
+        yOffset = this.characterLoader.getYOffset(data.roleId, gender);
+        console.log(`[EmployeeManager] Using custom model for ${data.roleId} with ${animations?.length ?? 0} animations, scaleOverride: ${scaleOverride ?? 'auto'}, yOffset: ${yOffset}`);
       } else {
         // No model - Employee will use fallback mesh (cylinder + sphere)
         console.log(`[EmployeeManager] Using fallback mesh for ${data.roleId} (no model found)`);
@@ -241,7 +243,8 @@ export class EmployeeManager {
         characterModel,
         animations,
         getCityCollider(),
-        scaleOverride
+        scaleOverride,
+        yOffset
       );
 
       // Set up callbacks
@@ -288,7 +291,26 @@ export class EmployeeManager {
    * Update all employees
    */
   public update(deltaTime: number, playerPosition: THREE.Vector3): void {
-    for (const employee of this.employees.values()) {
+    // Collect positions of all fleeing employees for mutual avoidance
+    const fleeingPositions: Array<{ id: string; pos: THREE.Vector3 }> = [];
+    for (const [id, employee] of this.employees) {
+      const state = employee.getState();
+      if (state === 'fleeing' || state === 'panic') {
+        fleeingPositions.push({ id, pos: employee.getPosition() });
+      }
+    }
+
+    // Update each employee, providing nearby fleeing positions (excluding self)
+    for (const [id, employee] of this.employees) {
+      const state = employee.getState();
+      if (state === 'fleeing' || state === 'panic') {
+        const nearby = fleeingPositions
+          .filter(f => f.id !== id)
+          .map(f => f.pos);
+        employee.setNearbyFleeingPositions(nearby);
+      } else {
+        employee.setNearbyFleeingPositions([]);
+      }
       employee.update(deltaTime, playerPosition);
     }
   }
@@ -438,7 +460,7 @@ export const DEFAULT_EMPLOYEES: EmployeeData[] = [
   { name: 'Róbert', role: 'React / JAVA Developer', roleId: 'fullstack-developer', gender: 'male' },
 
   // QA/Testing (Orange) - 3 people
-  { name: 'Michal T.', role: 'Test Manager', roleId: 'qa-tester', gender: 'male' },
+  { name: 'Michal', role: 'Test Manager', roleId: 'qa-tester', gender: 'male' },
   { name: 'Karolína', role: 'Test Lead', roleId: 'qa-tester', gender: 'female' },
   { name: 'Jakub', role: 'QA Engineer', roleId: 'qa-tester', gender: 'male' },
 
@@ -451,14 +473,14 @@ export const DEFAULT_EMPLOYEES: EmployeeData[] = [
   { name: 'Ivana', role: 'Business Analyst', roleId: 'business-analyst', gender: 'female' },
 
   // UX Designers (Pink) - 2 people
-  { name: 'Honza D.', role: 'UX Designer', roleId: 'ux-designer', gender: 'male' },
+  { name: 'Honza', role: 'UX Designer', roleId: 'ux-designer', gender: 'male' },
   { name: 'Hana', role: 'UX Designer', roleId: 'ux-designer', gender: 'female' },
 
   // UI Designer (Magenta) - 1 person
   { name: 'Adam', role: 'UI Designer', roleId: 'ui-designer', gender: 'male' },
 
   // Solution Architect (Purple) - 1 person
-  { name: 'Tomáš A.', role: 'IT Solution Architect', roleId: 'solution-architect', gender: 'male' },
+  { name: 'Tomáš', role: 'IT Solution Architect', roleId: 'solution-architect', gender: 'male' },
 ];
 
 /**
