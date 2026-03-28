@@ -21,6 +21,7 @@ import { VictoryScreen } from './ui/VictoryScreen';
 import { LeaderboardScreen } from './ui/LeaderboardScreen';
 import { PowerupManager, PowerupType } from './powerups/PowerupManager';
 import { ScreenEffects } from './ui/ScreenEffects';
+import { GameJuice } from './effects/GameJuice';
 
 /**
  * WAG GAME - Main Entry Point
@@ -60,6 +61,7 @@ class Game {
   // Powerup system
   private powerupManager: PowerupManager | null = null;
   private screenEffects: ScreenEffects;
+  private gameJuice!: GameJuice;
 
   private previousTime = 0;
   private isLoading = true;
@@ -113,6 +115,9 @@ class Game {
 
     // Setup input
     this.inputManager = new InputManager(this.renderer.domElement);
+
+    // Initialize juice effects system
+    this.gameJuice = new GameJuice(this.camera, this.scene);
 
     // City will be created AFTER assets are loaded
     // this.city is initialized in start() after AssetLoader
@@ -465,6 +470,8 @@ class Game {
         this.audioManager.playPlayerCatchSound();
         // Reset idle voice timer after catch
         this.idleVoiceTimer = 0;
+        // Juice effects: shake, slow-mo, particles, flash, combo
+        this.gameJuice.onCatch(employee.getPosition());
       });
       this.employeeManager.setOnAllCaught(() => {
         console.log('[Game] ALL EMPLOYEES CAUGHT! Victory!');
@@ -545,6 +552,9 @@ class Game {
           this.applyPowerupEffect(powerup.type, true);
           // Play sound effect
           this.audioManager.playCatchSound(this.player!.getPosition());
+          // Juice: flash in powerup color + FOV kick
+          const hexColor = '#' + powerup.definition.color.toString(16).padStart(6, '0');
+          this.gameJuice.onPowerupCollect(hexColor);
         },
         onExpire: (powerup) => {
           console.log(`[Game] Powerup expired: ${powerup.definition.nameCz}`);
@@ -757,11 +767,21 @@ class Game {
 
     // Only update game when not in menu and not loading
     if (!this.isInMenu && !this.isLoading) {
+      // Update juice effects (returns slow-mo adjusted delta for game logic)
+      const gameDelta = this.gameJuice.update(deltaTime);
+
       // Update player
       if (this.player) {
-        this.player.update(deltaTime);
+        this.player.update(gameDelta);
         // Update audio listener position for spatial audio
         this.audioManager.updateListenerPosition(this.player.getPosition());
+
+        // FOV sprint zoom
+        if (this.player.isSprinting()) {
+          this.gameJuice.setTargetFOV(85);
+        } else {
+          this.gameJuice.resetFOV();
+        }
 
         // Update footstep sounds based on player movement
         this.audioManager.updateFootsteps(deltaTime, {
@@ -784,12 +804,14 @@ class Game {
           this.audioManager.playNetThrowSound();
           // Notify HUD of fire
           this.hud.onFire();
+          // Net throw juice: light screen shake
+          this.gameJuice.onNetThrow();
         }
       }
 
-      // Update employees
+      // Update employees (use gameDelta for slow-mo support)
       if (this.employeeManager && this.player) {
-        this.employeeManager.update(deltaTime, this.player.getPosition());
+        this.employeeManager.update(gameDelta, this.player.getPosition());
 
         // Update dynamic music intensity based on nearby fleeing employees
         const fleeingCount = this.employeeManager.getFleeingCountNearby(
@@ -830,7 +852,7 @@ class Game {
       // Update net launcher with employee positions
       if (this.netLauncher && this.employeeManager) {
         const employeePositions = this.employeeManager.getActivePositions();
-        this.netLauncher.update(deltaTime, employeePositions);
+        this.netLauncher.update(gameDelta, employeePositions);
       }
 
       // Update audio manager (music volume interpolation)
