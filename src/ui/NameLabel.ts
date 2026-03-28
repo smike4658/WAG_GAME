@@ -61,13 +61,13 @@ export class NameLabel {
 
   /**
    * Update label visibility based on distance to camera
+   * @param isOccluded - true if NPC is behind a building (from raycast)
    */
-  public updateVisibility(distanceToCamera: number): void {
-    // Fade out when far away - visible from greater distance
-    const maxDistance = 70;
-    const minDistance = 5;
+  public updateVisibility(distanceToCamera: number, isOccluded: boolean = false): void {
+    const maxDistance = 25; // Only show labels when reasonably close
+    const minDistance = 3;
 
-    if (distanceToCamera > maxDistance) {
+    if (isOccluded || distanceToCamera > maxDistance) {
       this.element.style.opacity = '0';
     } else if (distanceToCamera > minDistance) {
       const fade = 1 - (distanceToCamera - minDistance) / (maxDistance - minDistance);

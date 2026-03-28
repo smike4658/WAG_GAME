@@ -987,9 +987,25 @@ export class Employee {
       this.mixer.update(deltaTime);
     }
 
-    // Update name label visibility
+    // Update name label visibility - hide behind buildings
     if (this.nameLabel) {
-      this.nameLabel.updateVisibility(distanceToPlayer);
+      let occluded = false;
+      if (this.collider && distanceToPlayer < 25) {
+        // Check if there's a building between player and NPC
+        const npcPos = this.mesh.position.clone();
+        npcPos.y += 1.5; // Head height
+        const toPlayer = playerPosition.clone().sub(npcPos);
+        toPlayer.y = 0; // Only check horizontally
+        const dist2D = toPlayer.length();
+        if (dist2D > 0.1) {
+          toPlayer.normalize();
+          // Sample a point halfway between NPC and player
+          const midPoint = npcPos.clone().add(toPlayer.multiplyScalar(dist2D * 0.5));
+          midPoint.y = 1.0;
+          occluded = this.collider.checkSphere(midPoint, 0.3) !== null;
+        }
+      }
+      this.nameLabel.updateVisibility(distanceToPlayer, occluded);
     }
 
     // Update programmatic animation (bobbing, tilting)
