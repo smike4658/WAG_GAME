@@ -259,6 +259,12 @@ export class EmployeeManager {
           this.onNightRefuse(emp);
         }
       });
+      employee.setOnSprintBurst((emp) => {
+        // Uses scream callback for the sprint burst voice line
+        if (this.onScream) {
+          this.onScream(emp);
+        }
+      });
 
       this.employees.set(id, employee);
       this.scene.add(employee.getMesh());

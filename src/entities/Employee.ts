@@ -121,6 +121,21 @@ export class Employee {
   private lastPosition: THREE.Vector3 = new THREE.Vector3();
   private stuckTimer = 0;
 
+  // Sprint burst - NPC temporarily speeds up with "I won't go to work!" shout
+  private sprintBurstActive = false;
+  private sprintBurstTimer = 0;
+  private readonly sprintBurstDuration = 1.5; // seconds
+  private readonly sprintBurstMultiplier = 2.5; // speed multiplier during burst
+  private readonly sprintBurstChance = 0.3; // 30% chance on flee start
+  private hasUsedSprintBurst = false; // only once per encounter
+
+  // Sprint burst callback (for special voice line)
+  private onSprintBurst: ((employee: Employee) => void) | null = null;
+
+  // Dust trail particles during sprint burst
+  private dustTrailParticles: THREE.Points | null = null;
+  private dustTrailTime = 0;
+
   // Visual
   private characterMesh: THREE.Group | null = null;
   private fallbackBody: THREE.Mesh | null = null;
@@ -562,6 +577,13 @@ export class Employee {
   }
 
   /**
+   * Set callback when employee does a sprint burst
+   */
+  public setOnSprintBurst(callback: (employee: Employee) => void): void {
+    this.onSprintBurst = callback;
+  }
+
+  /**
    * Set callback when employee refuses to work at night
    */
   public setOnNightRefuse(callback: (employee: Employee) => void): void {
@@ -661,6 +683,103 @@ export class Employee {
    */
   public getState(): EmployeeState {
     return this.state;
+  }
+
+  /**
+   * Activate sprint burst - NPC shouts and runs faster for a short time
+   */
+  private activateSprintBurst(): void {
+    this.sprintBurstActive = true;
+    this.sprintBurstTimer = 0;
+    this.hasUsedSprintBurst = true;
+
+    // Trigger burst callback (for special voice line)
+    if (this.onSprintBurst) {
+      this.onSprintBurst(this);
+    }
+
+    // Create dust trail particles
+    this.createDustTrail();
+  }
+
+  /**
+   * Create dust trail particles behind sprinting NPC
+   */
+  private createDustTrail(): void {
+    if (this.dustTrailParticles) return;
+
+    const count = 30;
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    // Initialize all at NPC position
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      positions[i3] = this.mesh.position.x;
+      positions[i3 + 1] = 0.2;
+      positions[i3 + 2] = this.mesh.position.z;
+    }
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const material = new THREE.PointsMaterial({
+      color: 0xCCBB99,
+      size: 0.2,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false,
+    });
+
+    this.dustTrailParticles = new THREE.Points(geometry, material);
+    this.dustTrailParticles.frustumCulled = false;
+    this.mesh.parent?.add(this.dustTrailParticles);
+  }
+
+  /**
+   * Update dust trail particles
+   */
+  private updateDustTrail(deltaTime: number): void {
+    if (!this.dustTrailParticles) return;
+
+    this.dustTrailTime += deltaTime;
+    const posAttr = this.dustTrailParticles.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const positions = posAttr.array as Float32Array;
+    const count = positions.length / 3;
+
+    // Shift particles back, oldest at end
+    for (let i = count - 1; i > 0; i--) {
+      const i3 = i * 3;
+      const prev3 = (i - 1) * 3;
+      positions[i3] = positions[prev3]!;
+      positions[i3 + 1] = positions[prev3 + 1]! + (Math.random() - 0.3) * 0.05;
+      positions[i3 + 2] = positions[prev3]! !== undefined ? positions[prev3 + 2]! : 0;
+    }
+
+    // Newest particle at NPC feet with jitter
+    positions[0] = this.mesh.position.x + (Math.random() - 0.5) * 0.3;
+    positions[1] = 0.15 + Math.random() * 0.2;
+    positions[2] = this.mesh.position.z + (Math.random() - 0.5) * 0.3;
+
+    posAttr.needsUpdate = true;
+
+    // Fade out when burst ends
+    const material = this.dustTrailParticles.material as THREE.PointsMaterial;
+    if (!this.sprintBurstActive) {
+      material.opacity -= deltaTime * 2;
+      if (material.opacity <= 0) {
+        this.removeDustTrail();
+      }
+    }
+  }
+
+  /**
+   * Remove dust trail particles
+   */
+  private removeDustTrail(): void {
+    if (this.dustTrailParticles) {
+      this.dustTrailParticles.parent?.remove(this.dustTrailParticles);
+      this.dustTrailParticles.geometry.dispose();
+      (this.dustTrailParticles.material as THREE.Material).dispose();
+      this.dustTrailParticles = null;
+    }
   }
 
   /**
@@ -949,6 +1068,8 @@ export class Employee {
       if (distanceToPlayer > this.config.detectionRadius) {
         this.state = 'alert'; // Stay alert, don't go back to idle immediately
         this.hasScreamedThisEncounter = false; // Reset for next encounter
+        this.hasUsedSprintBurst = false; // Reset sprint burst for next encounter
+        this.sprintBurstActive = false;
         this.screamTimer = 0; // Reset periodic scream timer
       }
       return;
@@ -1094,6 +1215,11 @@ export class Employee {
           this.onScream(this);
         }
       }
+
+      // 30% chance for sprint burst on first flee
+      if (!this.hasUsedSprintBurst && Math.random() < this.sprintBurstChance) {
+        this.activateSprintBurst();
+      }
     }
   }
 
@@ -1142,7 +1268,22 @@ export class Employee {
       this.nearbyFleeingPositions
     );
 
-    this.velocity.copy(bestDirection.multiplyScalar(this.config.runSpeed));
+    // Apply speed with sprint burst multiplier
+    const speed = this.sprintBurstActive
+      ? this.config.runSpeed * this.sprintBurstMultiplier
+      : this.config.runSpeed;
+    this.velocity.copy(bestDirection.multiplyScalar(speed));
+
+    // Update sprint burst timer
+    if (this.sprintBurstActive) {
+      this.sprintBurstTimer += deltaTime;
+      if (this.sprintBurstTimer >= this.sprintBurstDuration) {
+        this.sprintBurstActive = false;
+      }
+    }
+
+    // Update dust trail
+    this.updateDustTrail(deltaTime);
   }
 
   /**
@@ -1315,6 +1456,9 @@ export class Employee {
 
     // Dispose sleep indicator
     this.hideSleepIndicator();
+
+    // Dispose dust trail
+    this.removeDustTrail();
 
     // Dispose fallback meshes
     if (this.fallbackBody) {
