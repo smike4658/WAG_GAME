@@ -67,6 +67,12 @@ export class Player {
   private baseHeight: number;
   private drunkTime = 0;
 
+  // Reusable objects for per-frame calculations
+  private readonly _yawQuat = new THREE.Quaternion();
+  private readonly _yawAxis = new THREE.Vector3(0, 1, 0);
+  private readonly _rollQuat = new THREE.Quaternion();
+  private readonly _rollAxis = new THREE.Vector3(0, 0, 1);
+
   constructor(
     camera: THREE.PerspectiveCamera,
     inputManager: InputManager,
@@ -215,9 +221,8 @@ export class Player {
       this.direction.normalize();
 
       // Transform by camera yaw only
-      const yawQuaternion = new THREE.Quaternion();
-      yawQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.euler.y);
-      this.direction.applyQuaternion(yawQuaternion);
+      this._yawQuat.setFromAxisAngle(this._yawAxis, this.euler.y);
+      this.direction.applyQuaternion(this._yawQuat);
 
       // Calculate speed with sprint and powerup multipliers
       const baseSpeed = this.config.moveSpeed;
@@ -356,10 +361,9 @@ export class Player {
     const swayAmount = this.powerupModifiers.drunkIntensity * 0.08;
     const roll = Math.sin(this.drunkTime) * swayAmount;
 
-    // Create roll quaternion and multiply with current camera quaternion
-    const rollQuat = new THREE.Quaternion();
-    rollQuat.setFromAxisAngle(new THREE.Vector3(0, 0, 1), roll);
-    this.camera.quaternion.multiply(rollQuat);
+    // Apply roll quaternion to current camera quaternion
+    this._rollQuat.setFromAxisAngle(this._rollAxis, roll);
+    this.camera.quaternion.multiply(this._rollQuat);
   }
 
   /**

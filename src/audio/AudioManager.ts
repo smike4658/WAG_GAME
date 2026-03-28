@@ -355,7 +355,7 @@ export class AudioManager {
       const distance = this.listenerPosition.distanceTo(position);
       const maxDistance = 80; // Very large hearing range for NPC voices
       const baseVolume = Math.max(0.4, 1 - distance / maxDistance); // Minimum 40% volume
-      const volume = baseVolume * 5.0; // 5x multiplier for loudness (very prominent NPC voices)
+      const volume = Math.min(1.0, baseVolume * 5.0); // 5x multiplier clamped to prevent clipping
 
       const id = sound.play();
       sound.volume(volume, id);
@@ -398,8 +398,7 @@ export class AudioManager {
     const distance = this.listenerPosition.distanceTo(position);
     const maxDistance = 50;
     const baseVolume = Math.max(0, 1 - distance / maxDistance);
-    // Allow volume above 1.0 for louder NPC voices (Howler.js supports gain boost)
-    const volume = baseVolume * volumeMultiplier;
+    const volume = Math.min(1.0, baseVolume * volumeMultiplier);
 
     if (volume <= 0) return; // Too far to hear
 
