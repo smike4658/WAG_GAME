@@ -12,11 +12,11 @@ interface NetConfig {
 }
 
 const DEFAULT_CONFIG: NetConfig = {
-  range: 10,           // Shotgun style - must get close
-  speed: 20,           // Slightly slower
-  cooldown: 1,
+  range: 20,           // Long range for arcade feel
+  speed: 30,           // Fast projectile
+  cooldown: 0.6,       // Rapid fire
   radius: 0.3,
-  catchRadius: 1.5,    // Smaller but still fair
+  catchRadius: 2.5,    // Generous hitbox
 };
 
 /**

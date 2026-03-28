@@ -20,7 +20,7 @@ export class GameTimer {
   private elapsedAtPause = 0;
 
   // Countdown mode
-  private countdownMs = 180_000; // 3 minutes default
+  private countdownMs = 150_000; // 2:30 for arcade pace
   private bonusTimeMs = 0;
   private isUrgent = false;
   private onTimeUp: (() => void) | null = null;

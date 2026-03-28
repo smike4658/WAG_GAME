@@ -26,14 +26,14 @@ interface PowerupModifiers {
 }
 
 const DEFAULT_CONFIG: PlayerConfig = {
-  moveSpeed: 8,        // Fast movement for dynamic gameplay
+  moveSpeed: 10,       // Fast base movement for arcade feel
   jumpForce: 10,
   lookSensitivity: 0.002,
   height: 1.7,
   collisionRadius: 0.4,
-  sprintMultiplier: 1.6,  // 60% faster when sprinting
-  sprintDuration: 2,      // 2 seconds of sprint
-  sprintCooldown: 4,      // 4 seconds cooldown after sprint ends
+  sprintMultiplier: 2.0,  // 2x speed burst
+  sprintDuration: 1.5,    // Short burst sprint
+  sprintCooldown: 2,      // Quick recovery
 };
 
 /**

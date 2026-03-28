@@ -27,9 +27,9 @@ interface PersonalityConfig {
  * Personality presets
  */
 const PERSONALITIES: Record<PersonalityType, PersonalityConfig> = {
-  paranoid: { detectionRadius: 37.5, fleeRadius: 27, runSpeed: 10, panicDuration: 0.2 },
-  normal: { detectionRadius: 22.5, fleeRadius: 18, runSpeed: 9, panicDuration: 0.25 },
-  dreamy: { detectionRadius: 15, fleeRadius: 12, runSpeed: 8, panicDuration: 0.35 },
+  paranoid: { detectionRadius: 40, fleeRadius: 30, runSpeed: 7, panicDuration: 0.5 },
+  normal: { detectionRadius: 20, fleeRadius: 15, runSpeed: 5.5, panicDuration: 0.7 },
+  dreamy: { detectionRadius: 12, fleeRadius: 8, runSpeed: 4.5, panicDuration: 0.8 },
 };
 
 /**
@@ -63,11 +63,11 @@ export interface EmployeeConfig {
 }
 
 const DEFAULT_CONFIG: Omit<EmployeeConfig, 'name' | 'role' | 'roleId' | 'gender' | 'color' | 'personality'> = {
-  walkSpeed: 3,
-  runSpeed: 9,
-  detectionRadius: 22.5,
-  fleeRadius: 18,
-  panicDuration: 0.25,
+  walkSpeed: 2.5,
+  runSpeed: 5.5,
+  detectionRadius: 20,
+  fleeRadius: 15,
+  panicDuration: 0.7,
 };
 
 /**
@@ -661,6 +661,19 @@ export class Employee {
    */
   public getState(): EmployeeState {
     return this.state;
+  }
+
+  /**
+   * Scatter - triggered when nearby employee is caught
+   * Forces immediate flee state regardless of distance to player
+   */
+  public triggerScatter(): void {
+    if (this.state === 'caught' || this.state === 'fleeing') return;
+    this.state = 'fleeing';
+    this.hasScreamedThisEncounter = false; // Allow scream on scatter
+    if (this.onScream) {
+      this.onScream(this);
+    }
   }
 
   /**

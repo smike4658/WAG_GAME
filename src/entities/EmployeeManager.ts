@@ -278,6 +278,17 @@ export class EmployeeManager {
       `[EmployeeManager] ${employee.config.name} (${employee.config.role}) caught! ${remaining} remaining`
     );
 
+    // Scatter nearby employees - they panic and flee when they see a colleague caught
+    const catchPos = employee.getPosition();
+    const scatterRadius = 15;
+    for (const other of this.employees.values()) {
+      if (other === employee || other.getState() === 'caught') continue;
+      const dist = other.getPosition().distanceTo(catchPos);
+      if (dist < scatterRadius) {
+        other.triggerScatter();
+      }
+    }
+
     if (this.onCatch) {
       this.onCatch(employee, remaining);
     }

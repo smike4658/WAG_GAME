@@ -799,7 +799,7 @@ class Game {
     const elapsedMs = this.hud.getGameTimerElapsedMs();
     const totalSec = elapsedMs / 1000;
 
-    // Rating based on time
+    // Rating based on time (arcade pace: S < 60s, A < 90s, B < 120s)
     const rating = totalSec < 60 ? 'S' : totalSec < 90 ? 'A' : totalSec < 120 ? 'B' : 'C';
     const ratingColor = rating === 'S' ? '#FFD700' : rating === 'A' ? '#00FF88' : rating === 'B' ? '#4488FF' : '#AAAAAA';
 
