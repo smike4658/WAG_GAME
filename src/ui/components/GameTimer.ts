@@ -19,6 +19,15 @@ export class GameTimer {
   private pausedTime = 0;
   private elapsedAtPause = 0;
 
+  // Countdown mode
+  private countdownMs = 180_000; // 3 minutes default
+  private bonusTimeMs = 0;
+  private isUrgent = false;
+  private onTimeUp: (() => void) | null = null;
+
+  // Large countdown overlay for last 10 seconds
+  private largeTimerOverlay: HTMLDivElement | null = null;
+
   constructor(style: Partial<HUDStyleConfig> = {}) {
     this.style = { ...DEFAULT_HUD_STYLE, ...style };
 
@@ -117,8 +126,14 @@ export class GameTimer {
     this.startTime = 0;
     this.pausedTime = 0;
     this.elapsedAtPause = 0;
-    this.updateDisplay(0);
+    this.bonusTimeMs = 0;
+    this.isUrgent = false;
+    this.hideLargeTimer();
+    this.updateDisplay(this.countdownMs);
     this.container.style.borderColor = 'rgba(255, 215, 0, 0.3)';
+    this.container.style.transform = 'scale(1)';
+    this.timeDisplay.style.color = this.style.primaryColor;
+    this.labelDisplay.textContent = 'TIME';
   }
 
   /**
@@ -191,11 +206,98 @@ export class GameTimer {
   }
 
   /**
+   * Set countdown duration (call before start)
+   */
+  public setCountdownDuration(ms: number): void {
+    this.countdownMs = ms;
+  }
+
+  /**
+   * Set callback for when time runs out
+   */
+  public setOnTimeUp(callback: () => void): void {
+    this.onTimeUp = callback;
+  }
+
+  /**
+   * Add bonus time (from combos)
+   */
+  public addBonusTime(ms: number): void {
+    this.bonusTimeMs += ms;
+  }
+
+  /**
+   * Get remaining time in ms
+   */
+  public getRemainingMs(): number {
+    const elapsed = this.getElapsedMs();
+    return Math.max(0, this.countdownMs + this.bonusTimeMs - elapsed);
+  }
+
+  /**
    * Update display (call each frame when running)
    */
   public update(): void {
     if (this.state === 'running') {
-      this.updateDisplay(this.getElapsedMs());
+      const remaining = this.getRemainingMs();
+      this.updateDisplay(remaining);
+
+      // Urgency effects
+      const seconds = remaining / 1000;
+      if (seconds <= 30 && !this.isUrgent) {
+        this.isUrgent = true;
+        this.labelDisplay.textContent = 'HURRY!';
+      }
+
+      if (seconds <= 30 && seconds > 0) {
+        // Pulsing red
+        const pulse = Math.sin(performance.now() / 200) * 0.5 + 0.5;
+        this.container.style.borderColor = `rgba(255, ${Math.floor(50 + pulse * 50)}, 0, 0.8)`;
+        this.timeDisplay.style.color = `rgb(255, ${Math.floor(80 + pulse * 80)}, ${Math.floor(pulse * 40)})`;
+        this.container.style.transform = `scale(${1 + pulse * 0.05})`;
+      }
+
+      // Large overlay for last 10 seconds
+      if (seconds <= 10 && seconds > 0) {
+        this.showLargeTimer(remaining);
+      } else {
+        this.hideLargeTimer();
+      }
+
+      // Time's up
+      if (remaining <= 0) {
+        this.stop();
+        this.hideLargeTimer();
+        if (this.onTimeUp) this.onTimeUp();
+      }
+    }
+  }
+
+  private showLargeTimer(remainingMs: number): void {
+    if (!this.largeTimerOverlay) {
+      this.largeTimerOverlay = document.createElement('div');
+      this.largeTimerOverlay.style.cssText = `
+        position: fixed; top: 15%; left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 72px; font-weight: 900;
+        font-family: 'Courier New', monospace;
+        color: #FF3333;
+        text-shadow: 0 0 30px rgba(255, 50, 50, 0.6), 0 2px 10px rgba(0,0,0,0.8);
+        pointer-events: none; z-index: 180;
+        opacity: 0.9;
+      `;
+      document.body.appendChild(this.largeTimerOverlay);
+    }
+    const secs = Math.ceil(remainingMs / 1000);
+    this.largeTimerOverlay.textContent = String(secs);
+    const pulse = Math.sin(performance.now() / 150) * 0.15 + 1;
+    this.largeTimerOverlay.style.transform = `translate(-50%, -50%) scale(${pulse})`;
+  }
+
+  private hideLargeTimer(): void {
+    if (this.largeTimerOverlay) {
+      this.largeTimerOverlay.remove();
+      this.largeTimerOverlay = null;
     }
   }
 
@@ -249,6 +351,7 @@ export class GameTimer {
    * Clean up resources
    */
   public dispose(): void {
+    this.hideLargeTimer();
     this.unmount();
   }
 }

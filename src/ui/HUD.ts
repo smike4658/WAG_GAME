@@ -320,6 +320,27 @@ export class HUD {
   }
 
   /**
+   * Add bonus time to countdown (from combos)
+   */
+  public addBonusTime(ms: number): void {
+    this.gameTimer.addBonusTime(ms);
+  }
+
+  /**
+   * Get remaining countdown time
+   */
+  public getRemainingMs(): number {
+    return this.gameTimer.getRemainingMs();
+  }
+
+  /**
+   * Set callback for when countdown expires
+   */
+  public setOnTimeUp(callback: () => void): void {
+    this.gameTimer.setOnTimeUp(callback);
+  }
+
+  /**
    * Clean up all resources
    */
   public dispose(): void {

@@ -22,6 +22,11 @@ import { LeaderboardScreen } from './ui/LeaderboardScreen';
 import { PowerupManager, PowerupType } from './powerups/PowerupManager';
 import { ScreenEffects } from './ui/ScreenEffects';
 import { GameJuice } from './effects/GameJuice';
+import { DirectionIndicator } from './ui/components/DirectionIndicator';
+import { AtmosphereParticles } from './effects/AtmosphereParticles';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 /**
  * WAG GAME - Main Entry Point
@@ -62,6 +67,9 @@ class Game {
   private powerupManager: PowerupManager | null = null;
   private screenEffects: ScreenEffects;
   private gameJuice!: GameJuice;
+  private directionIndicator!: DirectionIndicator;
+  private atmosphereParticles: AtmosphereParticles | null = null;
+  private composer!: EffectComposer;
 
   private previousTime = 0;
   private isLoading = true;
@@ -118,6 +126,18 @@ class Game {
 
     // Initialize juice effects system
     this.gameJuice = new GameJuice(this.camera, this.scene);
+    this.directionIndicator = new DirectionIndicator(this.camera);
+
+    // Post-processing: subtle bloom on emissive materials
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.3,  // Strength - subtle
+      0.4,  // Radius
+      0.85  // Threshold - only bright/emissive materials bloom
+    );
+    this.composer.addPass(bloomPass);
 
     // City will be created AFTER assets are loaded
     // this.city is initialized in start() after AssetLoader
@@ -362,6 +382,7 @@ class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
   }
 
   /**
@@ -565,6 +586,22 @@ class Game {
         },
       });
 
+      // Add fog for atmosphere
+      this.scene.fog = new THREE.FogExp2(0x87CEEB, 0.004);
+
+      // Add floating atmosphere particles
+      this.atmosphereParticles = new AtmosphereParticles(this.scene, 200, 60);
+
+      // Wire combo bonus time
+      this.gameJuice.setBonusTimeCallback((seconds) => {
+        this.hud.addBonusTime(seconds * 1000);
+      });
+
+      // Wire time's up callback
+      this.hud.setOnTimeUp(() => {
+        this.showTimeUpScreen();
+      });
+
       this.updateLoadingProgress(100, 'Ready!');
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -574,10 +611,12 @@ class Game {
       this.hud.resetGameTimer();
       this.isVictory = false;
 
-      const instructionsEl = document.getElementById('instructions');
-      if (instructionsEl) {
-        instructionsEl.style.display = 'block';
-      }
+      // Show level title splash
+      this.showLevelTitle(this.selectedLevel.name);
+
+      // Show 3-2-1 countdown then auto-request pointer lock
+      await this.showStartCountdown();
+      this.renderer.domElement.requestPointerLock();
 
       console.log(`[Game] ${this.selectedLevel.name} loaded successfully!`);
       console.log('[Game] Spawn position:', spawn);
@@ -588,6 +627,138 @@ class Game {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       this.hideLoadingOverlay();
     }
+  }
+
+  /**
+   * Show level title splash (fades out after 2s)
+   */
+  private showLevelTitle(name: string): void {
+    const el = document.createElement('div');
+    el.style.cssText = `
+      position: fixed; bottom: 15%; left: 50%;
+      transform: translateX(-50%);
+      font-size: 42px; font-weight: 900;
+      font-family: 'Segoe UI', sans-serif;
+      color: #FFD700;
+      text-shadow: 0 2px 15px rgba(0,0,0,0.8), 0 0 40px rgba(255,215,0,0.3);
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      pointer-events: none; z-index: 400;
+      opacity: 0;
+      transition: opacity 0.5s ease-in;
+    `;
+    el.textContent = name;
+    document.body.appendChild(el);
+
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+    setTimeout(() => { el.style.opacity = '0'; }, 3000);
+    setTimeout(() => { el.remove(); }, 4000);
+  }
+
+  /**
+   * 3-2-1 GO! countdown before game starts
+   */
+  private showStartCountdown(): Promise<void> {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; justify-content: center; align-items: center;
+        pointer-events: none; z-index: 500;
+      `;
+      document.body.appendChild(overlay);
+
+      const text = document.createElement('div');
+      text.style.cssText = `
+        font-size: 120px; font-weight: 900;
+        font-family: 'Segoe UI', sans-serif;
+        color: #FFD700;
+        text-shadow: 0 4px 20px rgba(0,0,0,0.8), 0 0 60px rgba(255,215,0,0.4);
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+      `;
+      overlay.appendChild(text);
+
+      const steps = ['3', '2', '1', 'GO!'];
+      let i = 0;
+
+      const showNext = (): void => {
+        if (i >= steps.length) {
+          overlay.remove();
+          resolve();
+          return;
+        }
+
+        text.textContent = steps[i]!;
+        text.style.transform = 'scale(0.3)';
+        text.style.opacity = '1';
+
+        requestAnimationFrame(() => {
+          text.style.transform = 'scale(1)';
+        });
+
+        setTimeout(() => {
+          text.style.opacity = '0';
+          text.style.transform = 'scale(1.5)';
+        }, 600);
+
+        i++;
+        setTimeout(showNext, 800);
+      };
+
+      showNext();
+    });
+  }
+
+  /**
+   * Show TIME'S UP screen (not hard fail - shows stats)
+   */
+  private showTimeUpScreen(): void {
+    this.isVictory = true; // Prevent further gameplay
+
+    const caught = this.employeeManager?.getCaughtCount() ?? 0;
+    const total = this.employeeManager?.getTotalCount() ?? 24;
+
+    document.exitPointerLock();
+    this.hud.setActive(false);
+
+    const screen = document.createElement('div');
+    screen.id = 'times-up';
+    screen.innerHTML = `
+      <div style="
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(139, 0, 0, 0.9);
+        color: white; display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        font-family: 'Segoe UI', sans-serif; z-index: 3000;
+      ">
+        <h1 style="margin: 0 0 20px 0; color: #FF6B6B; font-size: 72px;">TIME'S UP!</h1>
+        <p style="margin: 0 0 10px 0; font-size: 28px;">You caught <span style="color: #FFD700; font-weight: bold;">${caught}</span> of <span style="color: #FFD700; font-weight: bold;">${total}</span> employees</p>
+        <p style="margin: 0 0 30px 0; font-size: 18px; opacity: 0.7;">${caught === total ? 'Wait... you actually got them all!' : caught > total / 2 ? 'Not bad! Try again?' : 'Jirka needs more time...'}</p>
+        <div style="display: flex; gap: 15px;">
+          <button id="btn-retry" style="
+            padding: 15px 30px; font-size: 16px; border: none; border-radius: 8px;
+            cursor: pointer; background: linear-gradient(135deg, #FF6B6B, #FF4444);
+            color: white; font-weight: 600;
+          ">Try Again</button>
+          <button id="btn-menu-tu" style="
+            padding: 15px 30px; font-size: 16px;
+            border: 1px solid rgba(255,255,255,0.3); border-radius: 8px;
+            cursor: pointer; background: rgba(255,255,255,0.1);
+            color: white; font-weight: 600;
+          ">Main Menu</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(screen);
+
+    screen.querySelector('#btn-retry')?.addEventListener('click', () => {
+      screen.remove();
+      this.restartGame();
+    });
+    screen.querySelector('#btn-menu-tu')?.addEventListener('click', () => {
+      screen.remove();
+      this.returnToMenu();
+    });
   }
 
   /**
@@ -625,6 +796,17 @@ class Game {
     // Remove existing victory screen if any
     document.getElementById('victory')?.remove();
 
+    const elapsedMs = this.hud.getGameTimerElapsedMs();
+    const totalSec = elapsedMs / 1000;
+
+    // Rating based on time
+    const rating = totalSec < 60 ? 'S' : totalSec < 90 ? 'A' : totalSec < 120 ? 'B' : 'C';
+    const ratingColor = rating === 'S' ? '#FFD700' : rating === 'A' ? '#00FF88' : rating === 'B' ? '#4488FF' : '#AAAAAA';
+
+    const mins = Math.floor(totalSec / 60);
+    const secs = Math.floor(totalSec % 60);
+    const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+
     const victory = document.createElement('div');
     victory.id = 'victory';
     victory.innerHTML = `
@@ -643,9 +825,11 @@ class Game {
         font-family: 'Segoe UI', sans-serif;
         z-index: 3000;
       ">
-        <h1 style="margin: 0 0 20px 0; color: #FFD700; font-size: 72px;">VICTORY!</h1>
-        <p style="margin: 0 0 10px 0; font-size: 24px;">All employees have been recruited!</p>
-        <p style="margin: 0 0 20px 0; font-size: 18px; opacity: 0.8;">Jirka's team is complete.</p>
+        <h1 style="margin: 0 0 10px 0; color: #FFD700; font-size: 72px;">VICTORY!</h1>
+        <div style="font-size: 80px; font-weight: 900; color: ${ratingColor}; margin: 10px 0;
+          text-shadow: 0 0 30px ${ratingColor}60;">${rating}</div>
+        <p style="margin: 0 0 5px 0; font-size: 28px; font-family: 'Courier New', monospace;">${timeStr}</p>
+        <p style="margin: 0 0 20px 0; font-size: 16px; opacity: 0.6;">All ${this.employeeManager?.getTotalCount() ?? 24} employees recruited</p>
         <div style="display: flex; gap: 15px; margin-top: 20px;">
           <button id="btn-play-again" style="
             padding: 15px 30px;
@@ -853,6 +1037,11 @@ class Game {
       if (this.netLauncher && this.employeeManager) {
         const employeePositions = this.employeeManager.getActivePositions();
         this.netLauncher.update(gameDelta, employeePositions);
+
+        // Update direction indicator arrow
+        if (this.player) {
+          this.directionIndicator.update(employeePositions, this.player.getPosition());
+        }
       }
 
       // Update audio manager (music volume interpolation)
@@ -877,9 +1066,15 @@ class Game {
         );
         this.hud.update(hudData, deltaTime);
       }
+
+      // Update atmosphere particles
+      if (this.atmosphereParticles && this.player) {
+        this.atmosphereParticles.update(deltaTime, this.player.getPosition());
+      }
     }
 
-    this.renderer.render(this.scene, this.camera);
+    // Render with post-processing (bloom)
+    this.composer.render();
     this.labelRenderer.render(this.scene, this.camera);
   };
 }
