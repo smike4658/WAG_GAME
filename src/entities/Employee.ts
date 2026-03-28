@@ -151,7 +151,8 @@ export class Employee {
     characterModel?: THREE.Group,
     animations?: THREE.AnimationClip[],
     collider: CityCollider | null = null,
-    scaleOverride?: number
+    scaleOverride?: number,
+    yOffset?: number
   ) {
     this.id = id;
     this.collider = collider;
@@ -186,7 +187,7 @@ export class Employee {
 
     // Use provided 3D character model or create fallback
     if (characterModel) {
-      this.setupCharacterModel(characterModel, scaleOverride);
+      this.setupCharacterModel(characterModel, scaleOverride, yOffset);
       if (animations && animations.length > 0) {
         this.setupAnimations(animations);
       }
@@ -226,7 +227,7 @@ export class Employee {
   /**
    * Setup the 3D character model
    */
-  private setupCharacterModel(model: THREE.Group, scaleOverride?: number): void {
+  private setupCharacterModel(model: THREE.Group, scaleOverride?: number, yOffset?: number): void {
     // Create a wrapper group for the character
     this.characterMesh = new THREE.Group();
     this.characterMesh.name = 'character_wrapper';
@@ -253,10 +254,16 @@ export class Employee {
 
         // Skip objects that shouldn't be included in character bounds
         const excludePatterns = [
+          // Helper geometry
           'icosphere', 'sphere', 'helper', 'particle', 'effect',
           'light', 'camera', 'target', 'bone', 'armature', 'rig',
           'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
-          'shadow', 'ground_shadow', 'floor_shadow'
+          'shadow', 'ground_shadow', 'floor_shadow',
+          // Accessory patterns (should not affect foot position)
+          'cap', 'hat', 'headphone', 'headphones', 'earphone',
+          'backpack', 'bag', 'laptop', 'briefcase', 'folder',
+          'clipboard', 'tablet', 'phone', 'palette', 'blueprint',
+          'accessory', 'acc_', 'prop_'
         ];
 
         const shouldExclude = excludePatterns.some(pattern => name.includes(pattern));
@@ -319,10 +326,16 @@ export class Employee {
 
     // Exclusion patterns for non-character geometry
     const excludePatterns = [
+      // Helper geometry
       'icosphere', 'sphere', 'helper', 'particle', 'effect',
       'light', 'camera', 'target', 'bone', 'armature', 'rig',
       'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
-      'shadow', 'ground_shadow', 'floor_shadow'
+      'shadow', 'ground_shadow', 'floor_shadow',
+      // Accessory patterns (should not affect foot position)
+      'cap', 'hat', 'headphone', 'headphones', 'earphone',
+      'backpack', 'bag', 'laptop', 'briefcase', 'folder',
+      'clipboard', 'tablet', 'phone', 'palette', 'blueprint',
+      'accessory', 'acc_', 'prop_'
     ];
 
     model.traverse((child) => {
@@ -352,6 +365,12 @@ export class Employee {
     if (Math.abs(yCorrection) > 0.001) {
       model.position.y += yCorrection;
       console.log(`[Employee] ${this.config.name} - Y correction applied: ${yCorrection.toFixed(3)}m`);
+    }
+
+    // Apply manual Y offset if provided (for models that need fine-tuning)
+    if (yOffset !== undefined && yOffset !== 0) {
+      model.position.y += yOffset;
+      console.log(`[Employee] ${this.config.name} - manual yOffset applied: ${yOffset}m`);
     }
 
     console.log(`[Employee] ${this.config.name} - final size: ${finalSize.y.toFixed(2)}m`);
@@ -819,6 +838,14 @@ export class Employee {
     // Keep on ground
     this.mesh.position.y = 0;
 
+    // Hard clamp to map bounds - prevent employees from escaping play area
+    if (this.collider) {
+      const bounds = this.collider.getBounds();
+      const margin = 2;
+      this.mesh.position.x = Math.max(bounds.min.x + margin, Math.min(this.mesh.position.x, bounds.max.x - margin));
+      this.mesh.position.z = Math.max(bounds.min.z + margin, Math.min(this.mesh.position.z, bounds.max.z - margin));
+    }
+
     // Update last position for stuck detection
     this.lastPosition.copy(this.mesh.position);
 
@@ -983,6 +1010,13 @@ export class Employee {
         0,
         this.mesh.position.z + Math.sin(angle) * distance
       );
+      // Clamp wander target to map bounds
+      if (this.collider) {
+        const bounds = this.collider.getBounds();
+        const margin = 5;
+        this.targetPosition.x = Math.max(bounds.min.x + margin, Math.min(this.targetPosition.x, bounds.max.x - margin));
+        this.targetPosition.z = Math.max(bounds.min.z + margin, Math.min(this.targetPosition.z, bounds.max.z - margin));
+      }
     }
 
     // Move toward target
