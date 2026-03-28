@@ -258,6 +258,18 @@ export class CharacterLoader {
   }
 
   /**
+   * Get Y offset for a specific role and gender (if defined)
+   * Used for manual grounding correction when auto-detection fails
+   */
+  public getYOffset(roleId: string, gender: Gender): number {
+    const role = this.getRoleConfig(roleId);
+    if (!role) return 0;
+
+    const modelConfig = role.models[gender];
+    return modelConfig?.yOffset ?? 0;
+  }
+
+  /**
    * Get all available roles
    */
   public getAllRoles(): RoleConfig[] {

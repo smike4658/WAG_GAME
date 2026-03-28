@@ -15,6 +15,8 @@ export interface CharacterModel {
   hasNamedAnimations?: boolean;
   /** Manual scale override (bypasses auto-scaling) - use for models with incorrect bounding boxes */
   scaleOverride?: number;
+  /** Manual Y offset for grounding correction (positive = up, negative = down) */
+  yOffset?: number;
 }
 
 export interface RoleConfig {
