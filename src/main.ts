@@ -73,6 +73,9 @@ class Game {
   private idleVoiceTimer = 0;
   private readonly idleVoiceInterval = 15; // Play idle line every 15-25 seconds
 
+  // Reusable objects to avoid per-frame allocations
+  private readonly _euler = new THREE.Euler();
+
   constructor() {
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -609,6 +612,9 @@ class Game {
    * Show simple victory screen (no leaderboard)
    */
   private showSimpleVictoryScreen(): void {
+    // Remove existing victory screen if any
+    document.getElementById('victory')?.remove();
+
     const victory = document.createElement('div');
     victory.id = 'victory';
     victory.innerHTML = `
@@ -737,16 +743,16 @@ class Game {
    */
   private getPlayerRotation(): number {
     // Extract Y rotation from camera quaternion
-    const euler = new THREE.Euler();
-    euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-    return euler.y;
+    this._euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
+    return this._euler.y;
   }
 
   private animate = (): void => {
     requestAnimationFrame(this.animate);
 
     const currentTime = performance.now();
-    const deltaTime = (currentTime - this.previousTime) / 1000;
+    // Clamp deltaTime to prevent physics explosion after tab switch or lag spike
+    const deltaTime = Math.min((currentTime - this.previousTime) / 1000, 0.1);
     this.previousTime = currentTime;
 
     // Only update game when not in menu and not loading

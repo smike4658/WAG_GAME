@@ -99,6 +99,11 @@ export class Employee {
   // Movement
   private readonly velocity: THREE.Vector3 = new THREE.Vector3();
   private targetPosition: THREE.Vector3 | null = null;
+
+  // Reusable temp vectors to avoid per-frame allocations
+  private readonly _tmpVec1 = new THREE.Vector3();
+  private readonly _tmpVec2 = new THREE.Vector3();
+  private readonly _tmpVec3 = new THREE.Vector3();
   private idleTimer = 0;
   private readonly idleWanderInterval = 3; // seconds between wander targets
 
@@ -498,7 +503,12 @@ export class Employee {
     switch (this.state) {
       case 'idle':
       case 'sleeping':
-        this.playAnimation('idle');
+        // Play walk animation when moving, idle when still
+        if (this.velocity.length() > 0.5) {
+          this.playAnimation('walk');
+        } else {
+          this.playAnimation('idle');
+        }
         break;
       case 'alert':
         // Alert state - still idle but watching
@@ -516,12 +526,6 @@ export class Employee {
           this.playAnimation('run');
         }
         break;
-    }
-
-    // Also check if we're moving and should play walk animation
-    const speed = this.velocity.length();
-    if (this.state === 'idle' && speed > 0.5) {
-      this.playAnimation('walk');
     }
   }
 
@@ -760,9 +764,9 @@ export class Employee {
     }
 
     // Apply velocity with collision detection and obstacle avoidance
-    const moveAmount = this.velocity.clone().multiplyScalar(deltaTime);
-    const currentPos = this.mesh.position.clone();
-    const desiredPos = currentPos.clone().add(moveAmount);
+    const moveAmount = this._tmpVec1.copy(this.velocity).multiplyScalar(deltaTime);
+    const currentPos = this._tmpVec2.copy(this.mesh.position);
+    const desiredPos = this._tmpVec3.copy(currentPos).add(moveAmount);
 
     if (this.collider && moveAmount.lengthSq() > 0.000001) {
       // Use collision radius of 0.4 (same as player)
