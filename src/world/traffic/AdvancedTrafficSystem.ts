@@ -113,6 +113,12 @@ export class AdvancedTrafficSystem {
 
   // Scene reference for raycasting
   private scene: THREE.Scene | null = null;
+
+  // Reusable temp objects to avoid per-frame allocations
+  private readonly _tmpVec = new THREE.Vector3();
+  private readonly _tmpUp = new THREE.Vector3(0, 1, 0);
+  private readonly _tmpQuat = new THREE.Quaternion();
+  private readonly _tmpEuler = new THREE.Euler();
   private raycaster: THREE.Raycaster = new THREE.Raycaster();
 
   constructor(
@@ -352,11 +358,11 @@ export class AdvancedTrafficSystem {
 
     // Calculate initial lane offset
     const direction = nextWp.position.clone().sub(waypoint.position).normalize();
-    let laneOffset = new THREE.Vector3(0, 0, 0);
+    const laneOffset = new THREE.Vector3(0, 0, 0);
 
     // Only apply offset if waypoint is not already lane-specific
     if (!nextWp.direction) {
-      laneOffset = this.calculateLaneOffset(direction);
+      laneOffset.copy(this.calculateLaneOffset(direction));
     }
 
     // Calculate expected rotation based on direction to first waypoint
@@ -411,8 +417,7 @@ export class AdvancedTrafficSystem {
   private calculateLaneOffset(direction: THREE.Vector3): THREE.Vector3 {
     // Cross product with UP vector gives perpendicular direction
     // direction × UP = right vector
-    const up = new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(direction, up).normalize();
+    const right = this._tmpVec.crossVectors(direction, this._tmpUp).normalize();
     return right.multiplyScalar(this.config.laneOffset);
   }
 
@@ -499,7 +504,7 @@ export class AdvancedTrafficSystem {
     // If angle difference is too large (> 45 degrees), reduce speed significantly
     // Vehicle should turn first, then move
     const needsToTurn = Math.abs(angleDiffForMove) > 0.78; // ~45 degrees
-    const turnSpeedMultiplier = needsToTurn ? 0.1 : 1.0; // Almost stop while turning
+    const turnSpeedMultiplier = needsToTurn ? 0.4 : 1.0; // Slow down while turning but keep moving
 
     // Debug: log when vehicle is actively turning
     if (needsToTurn && vehicle.id === 'vehicle_0' && this.debugFrame % 30 === 0) {
@@ -514,12 +519,15 @@ export class AdvancedTrafficSystem {
       // But for now, let's just zero it out to fix the "off-road" issue
       vehicle.laneOffset.set(0, 0, 0);
     } else {
-      vehicle.laneOffset = this.calculateLaneOffset(direction);
+      vehicle.laneOffset.copy(this.calculateLaneOffset(direction));
     }
 
     // Move vehicle along centerline (reduced speed if turning)
     const moveDistance = vehicle.velocity * dt * turnSpeedMultiplier;
-    vehicle.position.add(direction.clone().multiplyScalar(moveDistance));
+    // Prevent overshooting the target waypoint (which causes direction reversal)
+    const distToTarget = vehicle.position.distanceTo(targetWp.position);
+    const clampedMove = Math.min(moveDistance, distToTarget);
+    vehicle.position.add(direction.clone().multiplyScalar(clampedMove));
 
     // Decrease traffic light ignore distance as vehicle moves
     if (vehicle.ignoreTrafficLightsDistance > 0) {
@@ -572,10 +580,9 @@ export class AdvancedTrafficSystem {
       // (e.g., if model forward is +X, offset is -PI/2)
       if (parent) {
         // Get parent's world rotation (handles nested hierarchies)
-        const parentWorldQuat = new THREE.Quaternion();
-        parent.getWorldQuaternion(parentWorldQuat);
-        const parentEuler = new THREE.Euler().setFromQuaternion(parentWorldQuat, 'YXZ');
-        const parentWorldRotY = parentEuler.y;
+        parent.getWorldQuaternion(this._tmpQuat);
+        this._tmpEuler.setFromQuaternion(this._tmpQuat, 'YXZ');
+        const parentWorldRotY = this._tmpEuler.y;
 
         vehicle.mesh.rotation.y = vehicle.smoothedRotationY + vehicle.modelRotationOffset - parentWorldRotY;
       } else {
@@ -761,8 +768,14 @@ export class AdvancedTrafficSystem {
     const currentWp = this.roadNetwork.getWaypoint(vehicle.targetWaypointId);
     if (!currentWp) return;
 
-    // Get current direction (from current position to target waypoint)
-    const currentDirection = currentWp.position.clone().sub(vehicle.position).normalize();
+    // Get current TRAVEL direction based on the road segment we just traversed
+    // Using previous→current waypoint direction instead of position→waypoint
+    // because the vehicle is already at the waypoint (within arrivalThreshold),
+    // making position-based direction unreliable/random
+    const prevWp = this.roadNetwork.getWaypoint(vehicle.currentWaypointId);
+    const currentDirection = prevWp
+      ? currentWp.position.clone().sub(prevWp.position).normalize()
+      : currentWp.position.clone().sub(vehicle.position).normalize();
 
     // Exclude BOTH the current waypoint AND the previous waypoint to prevent U-turns
     // This is the key fix - we need to filter out both to prevent oscillation
@@ -852,9 +865,12 @@ export class AdvancedTrafficSystem {
 
       if (nonBackwardOptions.length > 0) {
         bestNextId = nonBackwardOptions[Math.floor(Math.random() * nonBackwardOptions.length)]!;
+      } else if (currentWp.connections.length > 0) {
+        // Dead end or all options excluded - allow U-turn as last resort
+        // rather than staying stuck (which causes reverse driving when vehicle overshoots)
+        const anyOption = currentWp.connections.find(id => !excludeIds.has(id));
+        bestNextId = anyOption ?? currentWp.connections[0]!;
       } else {
-        // Absolute last resort: stay at current waypoint and wait
-        // Don't pick a backward direction - this would make the car drive in reverse
         bestNextId = null;
       }
     }
