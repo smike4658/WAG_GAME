@@ -125,7 +125,6 @@ export class Employee {
   private characterMesh: THREE.Group | null = null;
   private fallbackBody: THREE.Mesh | null = null;
   private fallbackHead: THREE.Mesh | null = null;
-  private readonly alertIndicator: THREE.Mesh;
 
   // Animation
   private mixer: THREE.AnimationMixer | null = null;
@@ -199,18 +198,6 @@ export class Employee {
     } else {
       this.createFallbackMesh();
     }
-
-    // Create alert indicator (floating exclamation) - large and bright for visibility
-    const alertGeometry = new THREE.ConeGeometry(0.25, 0.6, 4);
-    const alertMaterial = new THREE.MeshBasicMaterial({
-      color: 0xFFFF00,
-      transparent: true,
-      opacity: 0,
-    });
-    this.alertIndicator = new THREE.Mesh(alertGeometry, alertMaterial);
-    this.alertIndicator.position.y = 2.5;
-    this.alertIndicator.rotation.z = Math.PI; // Point up
-    this.mesh.add(this.alertIndicator);
 
     // Random initial rotation
     this.mesh.rotation.y = Math.random() * Math.PI * 2;
@@ -712,10 +699,6 @@ export class Employee {
       this.fallbackBody.material.emissiveIntensity = 0.3;
     }
 
-    // Hide alert indicator
-    if (this.alertIndicator.material instanceof THREE.MeshBasicMaterial) {
-      this.alertIndicator.material.opacity = 0;
-    }
 
     if (this.onCaught) {
       this.onCaught(this);
@@ -741,8 +724,6 @@ export class Employee {
     // Handle sleeping state during night
     if (this.state === 'sleeping') {
       this.updateSleeping(deltaTime, playerPosition);
-      // Still update animations and alert indicator
-      this.updateAlertIndicator(deltaTime);
       if (this.mixer) {
         this.mixer.update(deltaTime);
       }
@@ -868,9 +849,6 @@ export class Employee {
       const angle = Math.atan2(this.velocity.x, this.velocity.z);
       this.mesh.rotation.y = angle;
     }
-
-    // Update alert indicator
-    this.updateAlertIndicator(deltaTime);
 
     // Update animations
     if (this.mixer) {
@@ -1313,53 +1291,6 @@ export class Employee {
   }
 
   /**
-   * Update alert indicator visual
-   */
-  private updateAlertIndicator(deltaTime: number): void {
-    if (!(this.alertIndicator.material instanceof THREE.MeshBasicMaterial)) return;
-
-    const material = this.alertIndicator.material;
-
-    switch (this.state) {
-      case 'idle':
-        material.opacity = Math.max(0, material.opacity - deltaTime * 3);
-        this.alertIndicator.scale.setScalar(1);
-        break;
-      case 'sleeping':
-        // Blue/purple - sleeping, no alert indicator needed
-        material.opacity = Math.max(0, material.opacity - deltaTime * 3);
-        this.alertIndicator.scale.setScalar(1);
-        break;
-      case 'alert':
-        material.color.setHex(0xFFFF00); // Yellow
-        material.opacity = Math.min(0.8, material.opacity + deltaTime * 3);
-        this.alertIndicator.scale.setScalar(1);
-        break;
-      case 'panic': {
-        // Orange, rapidly pulsing - the "oh no!" moment
-        material.color.setHex(0xFF8800);
-        material.opacity = 1;
-        const panicPulse = (Math.sin(Date.now() * 0.03) + 1) / 2; // Faster pulse
-        this.alertIndicator.scale.setScalar(1.5 + panicPulse * 0.8);
-        break;
-      }
-      case 'fleeing': {
-        material.color.setHex(0xFF0000); // Bright red
-        material.opacity = 1;
-        // Fast pulsing effect for urgency
-        const fleePulse = (Math.sin(Date.now() * 0.015) + 1) / 2;
-        this.alertIndicator.scale.setScalar(1.2 + fleePulse * 0.6);
-        break;
-      }
-    }
-
-    // Bob up and down - more pronounced
-    if (material.opacity > 0) {
-      this.alertIndicator.position.y = 2.5 + Math.sin(Date.now() * 0.005) * 0.15;
-    }
-  }
-
-  /**
    * Clean up resources
    */
   public dispose(): void {
@@ -1385,12 +1316,6 @@ export class Employee {
       if (this.fallbackHead.material instanceof THREE.Material) {
         this.fallbackHead.material.dispose();
       }
-    }
-
-    // Dispose alert indicator
-    this.alertIndicator.geometry.dispose();
-    if (this.alertIndicator.material instanceof THREE.Material) {
-      this.alertIndicator.material.dispose();
     }
 
     // Dispose character mesh materials
