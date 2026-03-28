@@ -217,6 +217,42 @@ export class Employee {
   }
 
   /**
+   * Check if a mesh name indicates an accessory that should be excluded
+   * from bounding box calculations (to prevent floating characters)
+   */
+  private isAccessoryMesh(name: string): boolean {
+    const excludePatterns = [
+      // Helper/technical geometry
+      'icosphere', 'sphere', 'helper', 'particle', 'effect',
+      'light', 'camera', 'target', 'bone', 'armature', 'rig',
+      'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
+      'shadow', 'ground_shadow', 'floor_shadow',
+      // Head accessories
+      'cap', 'hat', 'headphone', 'headphones', 'earphone',
+      'hood', 'glasses', 'hair',
+      // Carried items
+      'backpack', 'bag', 'laptop', 'briefcase', 'folder',
+      'clipboard', 'tablet', 'phone', 'palette', 'blueprint',
+      'accessory', 'acc_', 'prop_',
+    ];
+
+    // Exact name matches for common accessory node names from actual models
+    const exactMatches = [
+      'backpack', 'folder', 'baseball_cap', 'headphones',
+      'clipboard', 'briefcase', 'laptop_bag', 'blueprints', 'tablet',
+      'headphone_band', 'headphone_l', 'headphone_r',
+      'clipboard_clip', 'clipboard_board',
+      'laptop_base', 'laptop_display', 'laptop_screen',
+      'hood_back', 'hood_left', 'hood_right', 'hood_top',
+      'glasses_bridge', 'glasses_left', 'glasses_right',
+      'hair_front',
+    ];
+
+    if (exactMatches.includes(name)) return true;
+    return excludePatterns.some(pattern => name.includes(pattern));
+  }
+
+  /**
    * Setup the 3D character model
    */
   private setupCharacterModel(model: THREE.Group, scaleOverride?: number, yOffset?: number): void {
@@ -245,26 +281,8 @@ export class Employee {
         const name = child.name.toLowerCase();
 
         // Skip objects that shouldn't be included in character bounds
-        const excludePatterns = [
-          // Helper geometry
-          'icosphere', 'sphere', 'helper', 'particle', 'effect',
-          'light', 'camera', 'target', 'bone', 'armature', 'rig',
-          'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
-          'shadow', 'ground_shadow', 'floor_shadow',
-          // Accessory patterns (should not affect foot position)
-          'cap', 'hat', 'headphone', 'headphones', 'earphone',
-          'backpack', 'bag', 'laptop', 'briefcase', 'folder',
-          'clipboard', 'tablet', 'phone', 'palette', 'blueprint',
-          'accessory', 'acc_', 'prop_'
-        ];
-
-        const shouldExclude = excludePatterns.some(pattern => name.includes(pattern));
-        if (shouldExclude) {
-          return;
-        }
-
-        // Skip meshes that are very small (likely helpers) or invisible
         if (!child.visible) return;
+        if (this.isAccessoryMesh(name)) return;
 
         // Expand box to include this mesh
         const meshBox = new THREE.Box3().setFromObject(child);
@@ -316,27 +334,9 @@ export class Employee {
     const finalBox = new THREE.Box3();
     let finalValidMeshCount = 0;
 
-    // Exclusion patterns for non-character geometry
-    const excludePatterns = [
-      // Helper geometry
-      'icosphere', 'sphere', 'helper', 'particle', 'effect',
-      'light', 'camera', 'target', 'bone', 'armature', 'rig',
-      'ctrl', 'control', 'null', 'locator', 'gizmo', 'marker',
-      'shadow', 'ground_shadow', 'floor_shadow',
-      // Accessory patterns (should not affect foot position)
-      'cap', 'hat', 'headphone', 'headphones', 'earphone',
-      'backpack', 'bag', 'laptop', 'briefcase', 'folder',
-      'clipboard', 'tablet', 'phone', 'palette', 'blueprint',
-      'accessory', 'acc_', 'prop_'
-    ];
-
     model.traverse((child) => {
       if (child instanceof THREE.Mesh && child.geometry && child.visible) {
-        const meshName = child.name.toLowerCase();
-        const shouldExclude = excludePatterns.some(pattern => meshName.includes(pattern));
-        if (shouldExclude) {
-          return;
-        }
+        if (this.isAccessoryMesh(child.name.toLowerCase())) return;
         const meshBox = new THREE.Box3().setFromObject(child);
         if (!meshBox.isEmpty()) {
           finalBox.union(meshBox);
